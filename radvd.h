@@ -274,6 +274,7 @@ int setup_linklocal_addr(struct Interface *);
 int setup_linklocal_addr(struct Interface *iface);
 int update_device_index(struct Interface *iface);
 int update_device_info(int sock, struct Interface *);
+struct AdvPrefix * search_prefix_list(struct AdvPrefix * list, struct in6_addr);
 
 /* interface.c */
 int check_iface(struct Interface *);

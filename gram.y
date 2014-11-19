@@ -22,7 +22,6 @@
 static int countbits(int b);
 static int count_mask(struct sockaddr_in6 *m);
 static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
-static struct AdvPrefix * search_prefix_list(struct AdvPrefix * list, struct in6_addr);
 
 #if 0 /* no longer necessary? */
 #ifndef HAVE_IN6_ADDR_S6_ADDR
@@ -1062,17 +1061,6 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 
 	return prefix;
 }
-
-static struct AdvPrefix * search_prefix_list(struct AdvPrefix * list, struct in6_addr Prefix)
-{
-	for (list; list; list = list->next) {
-		if (0 == memcmp(&list->Prefix, &Prefix, sizeof(Prefix))) {
-			return list;
-		}
-	}
-	return 0;
-}
-
 
 static void cleanup(void)
 {
