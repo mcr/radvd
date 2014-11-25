@@ -196,11 +196,23 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 	struct AdvPrefix * prefix = 0;
 
 	while (list) {
+
 		struct AdvPrefix * head = malloc(sizeof(struct AdvPrefix));
 		*head = *list;
 		head->next = prefix;
 		prefix = head;
 		list = list->next;
+
+		if ( prefix->if6to4[0] ) {
+			unsigned int dst;
+			if (get_v4addr(prefix->if6to4, &dst) < 0) {
+				flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", prefix->if6to4 );
+				prefix->enabled = 0;
+			} else {
+				*((uint16_t *)(prefix->Prefix.s6_addr)) = htons(0x2002);
+				memcpy( prefix->Prefix.s6_addr + 2, &dst, sizeof( dst ) );
+			}
+		}
 	}
 
 	return prefix;

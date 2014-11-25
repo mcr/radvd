@@ -365,8 +365,6 @@ v6addrlist	: IPV6ADDR ';'
 
 prefixdef	: prefixhead optional_prefixplist ';'
 		{
-				unsigned int dst;
-
 				if (prefix->AdvPreferredLifetime > prefix->AdvValidLifetime)
 				{
 					flog(LOG_ERR, "AdvValidLifeTime must be "
@@ -378,20 +376,6 @@ prefixdef	: prefixhead optional_prefixplist ';'
 				if ( prefix->if6[0] && prefix->if6to4[0]) {
 					flog(LOG_ERR, "Base6Interface and Base6to4Interface are mutually exclusive at this time");
 					ABORT;
-				}
-
-				if ( prefix->if6to4[0] )
-				{
-					if (get_v4addr(prefix->if6to4, &dst) < 0)
-					{
-						flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", prefix->if6to4 );
-						prefix->enabled = 0;
-					}
-					else
-					{
-						*((uint16_t *)(prefix->Prefix.s6_addr)) = htons(0x2002);
-						memcpy( prefix->Prefix.s6_addr + 2, &dst, sizeof( dst ) );
-					}
 				}
 
 				if ( prefix->if6[0] )
