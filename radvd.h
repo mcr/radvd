@@ -284,6 +284,7 @@ struct Interface *find_iface_by_time(struct Interface *iface_list);
 void dnssl_init_defaults(struct AdvDNSSL *, struct Interface *);
 void for_each_iface(struct Interface *ifaces, void (*foo) (struct Interface * iface, void *), void *data);
 void free_ifaces(struct Interface *ifaces);
+void free_prefix_list(struct AdvPrefix *prefix);
 void iface_init_defaults(struct Interface *);
 void prefix_init_defaults(struct AdvPrefix *);
 void rdnss_init_defaults(struct AdvRDNSS *, struct Interface *);

@@ -324,6 +324,15 @@ void for_each_iface(struct Interface *ifaces, void (*foo) (struct Interface *, v
 	}
 }
 
+void free_prefix_list(struct AdvPrefix *prefix)
+{
+	while (prefix) {
+		struct AdvPrefix *next_prefix = prefix->next;
+		free(prefix);
+		prefix = next_prefix;
+	}
+}
+
 static void free_iface_list(struct Interface *iface)
 {
 	while (iface) {
@@ -331,13 +340,7 @@ static void free_iface_list(struct Interface *iface)
 
 		dlog(LOG_DEBUG, 4, "freeing interface %s", iface->props.name);
 
-		struct AdvPrefix *prefix = iface->AdvPrefixList;
-		while (prefix) {
-			struct AdvPrefix *next_prefix = prefix->next;
-
-			free(prefix);
-			prefix = next_prefix;
-		}
+		free_prefix_list(iface->AdvPrefixList);
 
 		struct AdvRoute *route = iface->AdvRouteList;
 		while (route) {
