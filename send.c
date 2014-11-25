@@ -213,6 +213,63 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 				memcpy( prefix->Prefix.s6_addr + 2, &dst, sizeof( dst ) );
 			}
 		}
+
+#ifndef HAVE_IFADDRS_H
+		if ( prefix->if6[0] ) {
+			struct ifaddrs *ifap = 0, *ifa = 0;
+			struct AdvPrefix *next = prefix->next;
+
+			if (getifaddrs(&ifap) != 0)
+				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
+
+			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+				struct sockaddr_in6 *s6 = 0;
+				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
+				struct in6_addr base6prefix;
+				char buf[INET6_ADDRSTRLEN];
+				int i;
+
+				if (strncmp(ifa->ifa_name, prefix->if6, IFNAMSIZ))
+					continue;
+
+				if (ifa->ifa_addr->sa_family != AF_INET6)
+					continue;
+
+				s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
+
+				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr))
+					continue;
+
+				base6prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
+				if (search_prefix_list(next, base6prefix))
+					continue;
+
+				for (i = 0; i < 8; ++i) {
+					prefix->Prefix.s6_addr[i] &= ~mask->sin6_addr.s6_addr[i];
+					prefix->Prefix.s6_addr[i] |= base6prefix.s6_addr[i];
+				}
+				memset(&prefix->Prefix.s6_addr[8], 0, 8);
+				prefix->AdvRouterAddr = 1;
+				prefix->next = next;
+
+				if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
+					flog(LOG_ERR, "%s: inet_ntop failed in %s, line %d!", ifa->ifa_name, filename, num_lines);
+				else
+					dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s from interface %s",
+						buf, prefix->PrefixLen, iface->props.name, ifa->ifa_name);
+
+				/* Taking only one prefix from the Base6Interface.  Taking more than one would require allocating new
+				   prefixes and building a list.  I'm not sure how to do that from here. So for now, break. */
+				break;
+			}
+
+			if (ifap)
+				freeifaddrs(ifap);
+		}
+#endif /* ifndef HAVE_IFADDRS_H */
+#endif
+
+
 	}
 
 	return prefix;
