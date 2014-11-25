@@ -21,7 +21,6 @@
 #define YYERROR_VERBOSE 1
 static int countbits(int b);
 static int count_mask(struct sockaddr_in6 *m);
-static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
 
 #if 0 /* no longer necessary? */
 #ifndef HAVE_IN6_ADDR_S6_ADDR
@@ -905,18 +904,6 @@ static int count_mask(struct sockaddr_in6 *m)
 		count += countbits(in6->s6_addr[i]);
 	}
 	return count;
-}
-
-static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask)
-{
-	struct in6_addr prefix = *addr;
-	int i = 0;
-
-	for (; i < 16; ++i) {
-		prefix.s6_addr[i] &= mask->s6_addr[i];
-	}
-
-	return prefix;
 }
 
 static void cleanup(void)

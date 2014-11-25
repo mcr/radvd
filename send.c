@@ -17,6 +17,7 @@
 #include "includes.h"
 #include "radvd.h"
 
+static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
 static int really_send(int sock, struct in6_addr const *dest, struct properties const *props, struct safe_buffer const *sb);
 static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest);
 static void build_ra(struct safe_buffer * sb, struct Interface const * iface);
@@ -189,6 +190,18 @@ static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const *
 	radvert.nd_ra_retransmit = htonl(ra_header_info->AdvRetransTimer);
 
 	safe_buffer_append(sb, &radvert, sizeof(radvert));
+}
+
+static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask)
+{
+	struct in6_addr prefix = *addr;
+	int i = 0;
+
+	for (; i < 16; ++i) {
+		prefix.s6_addr[i] &= mask->s6_addr[i];
+	}
+
+	return prefix;
 }
 
 static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
