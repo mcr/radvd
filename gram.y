@@ -396,92 +396,32 @@ prefixdef	: prefixhead optional_prefixplist ';'
 
 prefixhead	: T_PREFIX IPV6ADDR '/' NUMBER
 		{
+#ifndef HAVE_IFADDRS_H
 			struct in6_addr zeroaddr;
 			memset(&zeroaddr, 0, sizeof(zeroaddr));
 
 			if (!memcmp($2, &zeroaddr, sizeof(struct in6_addr))) {
-#ifndef HAVE_IFADDRS_H
 				flog(LOG_ERR, "invalid all-zeros prefix in %s, line %d", filename, num_lines);
 				ABORT;
-#else
-				struct ifaddrs *ifap = 0, *ifa = 0;
-				struct AdvPrefix *next = iface->AdvPrefixList;
-
-				dlog(LOG_DEBUG, 5, "all-zeros prefix in %s, line %d", filename, num_lines);
-
-				if (getifaddrs(&ifap) != 0)
-					flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
-
-				for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-					struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-					struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
-					char buf[INET6_ADDRSTRLEN];
-
-					if (strncmp(ifa->ifa_name, iface->props.name, IFNAMSIZ))
-						continue;
-
-					if (ifa->ifa_addr->sa_family != AF_INET6)
-						continue;
-
-					s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
-
-					if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr))
-						continue;
-
-					struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-					if (search_prefix_list(next, Prefix))
-						continue;
-
-					prefix = malloc(sizeof(struct AdvPrefix));
-
-					if (prefix == NULL) {
-						flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
-						ABORT;
-					}
-
-					prefix_init_defaults(prefix);
-					prefix->Prefix = Prefix;
-					prefix->AdvRouterAddr = 1;
-					prefix->next = next;
-					next = prefix;
-
-					if (prefix->PrefixLen == 0)
-						prefix->PrefixLen = count_mask(mask);
-
-					if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
-						flog(LOG_ERR, "%s: inet_ntop failed in %s, line %d!", ifa->ifa_name, filename, num_lines);
-					else
-						dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s", buf, prefix->PrefixLen, ifa->ifa_name);
-				}
-
-				if (!prefix) {
-					flog(LOG_WARNING, "no auto-selected prefix on interface %s, disabling advertisements",  iface->props.name);
-				}
-
-				if (ifap)
-					freeifaddrs(ifap);
-#endif /* ifndef HAVE_IFADDRS_H */
 			}
-			else {
-				prefix = malloc(sizeof(struct AdvPrefix));
+#endif
+			prefix = malloc(sizeof(struct AdvPrefix));
 
-				if (prefix == NULL) {
-					flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
-					ABORT;
-				}
-
-				prefix_init_defaults(prefix);
-
-				if ($4 > MAX_PrefixLen)
-				{
-					flog(LOG_ERR, "invalid prefix length in %s, line %d", filename, num_lines);
-					ABORT;
-				}
-
-				prefix->PrefixLen = $4;
-
-				memcpy(&prefix->Prefix, $2, sizeof(struct in6_addr));
+			if (prefix == NULL) {
+				flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
+				ABORT;
 			}
+
+			prefix_init_defaults(prefix);
+
+			if ($4 > MAX_PrefixLen) {
+				flog(LOG_ERR, "invalid prefix length in %s, line %d", filename, num_lines);
+				ABORT;
+			}
+
+			prefix->PrefixLen = $4;
+
+			memcpy(&prefix->Prefix, $2, sizeof(struct in6_addr));
 		}
 		;
 

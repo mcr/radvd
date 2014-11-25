@@ -207,6 +207,8 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 {
 	struct AdvPrefix * prefix = 0;
+	struct in6_addr zeroaddr;
+	memset(&zeroaddr, 0, sizeof(zeroaddr));
 
 	while (list) {
 
@@ -215,6 +217,68 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 		head->next = prefix;
 		prefix = head;
 		list = list->next;
+#if 0
+#ifndef HAVE_IFADDRS_H
+		/* ::/64 auto-prefix */
+		if (0 == memcmp(&prefix->Prefix, &zeroaddr, sizeof(struct in6_addr)) && prefix->PrefixLen == 64) {
+			struct ifaddrs *ifap = 0, *ifa = 0;
+			struct AdvPrefix *next = iface->AdvPrefixList;
+
+			dlog(LOG_DEBUG, 5, "all-zeros prefix in %s, line %d", filename, num_lines);
+
+			if (getifaddrs(&ifap) != 0)
+				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
+
+			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+				struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
+				char buf[INET6_ADDRSTRLEN];
+
+				if (strncmp(ifa->ifa_name, iface->props.name, IFNAMSIZ))
+					continue;
+
+				if (ifa->ifa_addr->sa_family != AF_INET6)
+					continue;
+
+				s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
+
+				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr))
+					continue;
+
+				struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
+				if (search_prefix_list(next, Prefix))
+					continue;
+
+				prefix = malloc(sizeof(struct AdvPrefix));
+
+				if (prefix == NULL) {
+					flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
+					ABORT;
+				}
+
+				prefix_init_defaults(prefix);
+				prefix->Prefix = Prefix;
+				prefix->AdvRouterAddr = 1;
+				prefix->next = next;
+				next = prefix;
+
+				if (prefix->PrefixLen == 0)
+					prefix->PrefixLen = count_mask(mask);
+
+				if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
+					flog(LOG_ERR, "%s: inet_ntop failed in %s, line %d!", ifa->ifa_name, filename, num_lines);
+				else
+					dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s", buf, prefix->PrefixLen, ifa->ifa_name);
+			}
+
+			if (!prefix) {
+				flog(LOG_WARNING, "no auto-selected prefix on interface %s, disabling advertisements",  iface->props.name);
+			}
+
+			if (ifap)
+				freeifaddrs(ifap);
+		}
+#endif /* ifndef HAVE_IFADDRS_H */
 
 		if ( prefix->if6to4[0] ) {
 			unsigned int dst;
