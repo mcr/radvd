@@ -191,8 +191,26 @@ static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const *
 	safe_buffer_append(sb, &radvert, sizeof(radvert));
 }
 
-static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, int cease_adv)
+static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 {
+	struct AdvPrefix * prefix = 0;
+
+	while (list) {
+		struct AdvPrefix * head = malloc(sizeof(struct AdvPrefix));
+		*head = *list;
+		head->next = prefix;
+		prefix = head;
+		list = list->next;
+	}
+
+	return prefix;
+}
+
+static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *iface_prefix, int cease_adv)
+{
+	struct AdvPrefix * prefix_list = build_prefix_list(iface_prefix);
+	struct AdvPrefix * prefix = prefix_list;
+
 	while (prefix) {
 		if (prefix->enabled && (!prefix->DecrementLifetimesFlag || prefix->curr_preferredlft > 0)) {
 			struct nd_opt_prefix_info pinfo;
@@ -224,6 +242,8 @@ static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, 
 
 		prefix = prefix->next;
 	}
+
+	free_prefix_list(prefix_list);
 }
 
 
