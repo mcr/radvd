@@ -32,6 +32,7 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 #endif
 #endif
 
+/* TODO: Why add to the end of the list? */
 #define ADD_TO_LL(type, list, value) \
 	do { \
 		if (iface->list == NULL) \
