@@ -364,7 +364,6 @@ v6addrlist	: IPV6ADDR ';'
 
 prefixdef	: prefixhead optional_prefixplist ';'
 		{
-			if (prefix) {
 				unsigned int dst;
 
 				if (prefix->AdvPreferredLifetime > prefix->AdvValidLifetime)
@@ -439,7 +438,6 @@ prefixdef	: prefixhead optional_prefixplist ';'
 						}
 						memset(&prefix->Prefix.s6_addr[8], 0, 8);
 						prefix->AdvRouterAddr = 1;
-						prefix->AutoSelected = 1;
 						prefix->next = next;
 
 						if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
@@ -457,7 +455,7 @@ prefixdef	: prefixhead optional_prefixplist ';'
 						freeifaddrs(ifap);
 #endif /* ifndef HAVE_IFADDRS_H */
 				}
-			}
+
 			$$ = prefix;
 			prefix = NULL;
 		}
@@ -475,15 +473,6 @@ prefixhead	: T_PREFIX IPV6ADDR '/' NUMBER
 #else
 				struct ifaddrs *ifap = 0, *ifa = 0;
 				struct AdvPrefix *next = iface->AdvPrefixList;
-
-				while (next) {
-					if (next->AutoSelected) {
-						flog(LOG_ERR, "auto selecting prefixes works only once per interface.  See %s, line %d", filename, num_lines);
-						ABORT;
-					}
-					next = next->next;
-				}
-				next = 0;
 
 				dlog(LOG_DEBUG, 5, "all-zeros prefix in %s, line %d", filename, num_lines);
 
@@ -520,7 +509,6 @@ prefixhead	: T_PREFIX IPV6ADDR '/' NUMBER
 					prefix_init_defaults(prefix);
 					prefix->Prefix = Prefix;
 					prefix->AdvRouterAddr = 1;
-					prefix->AutoSelected = 1;
 					prefix->next = next;
 					next = prefix;
 
@@ -575,111 +563,46 @@ prefixplist	: prefixplist prefixparms
 
 prefixparms	: T_AdvOnLink SWITCH ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected) {
-					struct AdvPrefix *p = prefix;
-					do {
-						p->AdvOnLinkFlag = $2;
-						p = p->next;
-					} while (p && p->AutoSelected);
-				}
-				else
 					prefix->AdvOnLinkFlag = $2;
-			}
 		}
 		| T_AdvAutonomous SWITCH ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected) {
-					struct AdvPrefix *p = prefix;
-					do {
-						p->AdvAutonomousFlag = $2;
-						p = p->next;
-					} while (p && p->AutoSelected);
-				}
-				else
 					prefix->AdvAutonomousFlag = $2;
-			}
 		}
 		| T_AdvRouterAddr SWITCH ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected && $2 == 0)
-					flog(LOG_WARNING, "prefix automatically selected, AdvRouterAddr always enabled, ignoring config line %d", num_lines);
-				else
 					prefix->AdvRouterAddr = $2;
-			}
 		}
 		| T_AdvValidLifetime number_or_infinity ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected) {
-					struct AdvPrefix *p = prefix;
-					do {
-						p->AdvValidLifetime = $2;
-						p->curr_validlft = $2;
-						p = p->next;
-					} while (p && p->AutoSelected);
-				}
-				else {
 					prefix->AdvValidLifetime = $2;
 					prefix->curr_validlft = $2;
-				}
-			}
 		}
 		| T_AdvPreferredLifetime number_or_infinity ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected) {
-					struct AdvPrefix *p = prefix;
-					do {
-						p->AdvPreferredLifetime = $2;
-						p->curr_preferredlft = $2;
-						p = p->next;
-					} while (p && p->AutoSelected);
-				}
-				else {
 					prefix->AdvPreferredLifetime = $2;
 					prefix->curr_preferredlft = $2;
-				}
-			}
 		}
 		| T_DeprecatePrefix SWITCH ';'
 		{
-			if (prefix) {
 				prefix->DeprecatePrefixFlag = $2;
-			}
 		}
 		| T_DecrementLifetimes SWITCH ';'
 		{
-			if (prefix) {
 				prefix->DecrementLifetimesFlag = $2;
-			}
 		}
 		| T_Base6Interface name ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected) {
-					flog(LOG_ERR, "automatically selecting the prefix and Base6Interface are mutually exclusive");
-					ABORT;
-				} /* fallthrough */
 				dlog(LOG_DEBUG, 4, "using prefixes on interface %s for prefixes on interface %s", $2, iface->props.name);
 				strncpy(prefix->if6, $2, IFNAMSIZ-1);
 				prefix->if6[IFNAMSIZ-1] = '\0';
-			}
 		}
 
 		| T_Base6to4Interface name ';'
 		{
-			if (prefix) {
-				if (prefix->AutoSelected) {
-					flog(LOG_ERR, "automatically selecting the prefix and Base6to4Interface are mutually exclusive");
-					ABORT;
-				} /* fallthrough */
 				dlog(LOG_DEBUG, 4, "using interface %s for 6to4 prefixes on interface %s", $2, iface->props.name);
 				strncpy(prefix->if6to4, $2, IFNAMSIZ-1);
 				prefix->if6to4[IFNAMSIZ-1] = '\0';
-			}
 		}
 		;
 
