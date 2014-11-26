@@ -17,27 +17,27 @@
 #include "includes.h"
 #include "radvd.h"
 
-static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
+static int count_mask(struct sockaddr_in6 *m);
+static int countbits(int b);
+static int ensure_iface_setup(int sock, struct Interface *iface);
 static int really_send(int sock, struct in6_addr const *dest, struct properties const *props, struct safe_buffer const *sb);
 static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest);
+static size_t serialize_domain_names(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl);
+static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
+static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo);
+static void add_dnssl(struct safe_buffer * sb, struct AdvDNSSL const *dnssl, int cease_adv);
+static void add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowpanco);
+static void add_mipv6_home_agent_info(struct safe_buffer * sb, struct mipv6 const * mipv6);
+static void add_mipv6_rtr_adv_interval(struct safe_buffer * sb, double MaxRtrAdvInterval);
+static void add_mtu(struct safe_buffer * sb, uint32_t AdvLinkMTU);
+static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const * prefix, int cease_adv);
+static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const * ra_header_info, int cease_adv);
+static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv);
+static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv);
+static void add_sllao(struct safe_buffer * sb, struct sllao const *sllao);
 static void build_ra(struct safe_buffer * sb, struct Interface const * iface);
-
-static int ensure_iface_setup(int sock, struct Interface *iface);
 static void decrement_lifetime(const time_t secs, uint32_t * lifetime);
 static void update_iface_times(struct Interface * iface);
-
-static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const * ra_header_info, int cease_adv);
-static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const * prefix, int cease_adv);
-static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv);
-static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv);
-static size_t serialize_domain_names(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl);
-static void add_dnssl(struct safe_buffer * sb, struct AdvDNSSL const *dnssl, int cease_adv);
-static void add_mtu(struct safe_buffer * sb, uint32_t AdvLinkMTU);
-static void add_sllao(struct safe_buffer * sb, struct sllao const *sllao);
-static void add_mipv6_rtr_adv_interval(struct safe_buffer * sb, double MaxRtrAdvInterval);
-static void add_mipv6_home_agent_info(struct safe_buffer * sb, struct mipv6 const * mipv6);
-static void add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowpanco);
-static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo);
 
 #ifdef UNIT_TEST
 #include "test/send.c"
@@ -202,6 +202,29 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 	}
 
 	return prefix;
+}
+
+static int countbits(int b)
+{
+	int count;
+
+	for (count = 0; b != 0; count++) {
+		b &= b - 1; // this clears the LSB-most set bit
+	}
+
+	return (count);
+}
+
+static int count_mask(struct sockaddr_in6 *m)
+{
+	struct in6_addr *in6 = &m->sin6_addr;
+	int i;
+	int count = 0;
+
+	for (i = 0; i < 16; ++i) {
+		count += countbits(in6->s6_addr[i]);
+	}
+	return count;
 }
 
 static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)

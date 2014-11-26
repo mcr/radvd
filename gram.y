@@ -19,8 +19,6 @@
 #include "defaults.h"
 
 #define YYERROR_VERBOSE 1
-static int countbits(int b);
-static int count_mask(struct sockaddr_in6 *m);
 
 #if 0 /* no longer necessary? */
 #ifndef HAVE_IN6_ADDR_S6_ADDR
@@ -822,29 +820,6 @@ number_or_infinity	: NUMBER
 			;
 
 %%
-
-static int countbits(int b)
-{
-	int count;
-
-	for (count = 0; b != 0; count++) {
-		b &= b - 1; // this clears the LSB-most set bit
-	}
-
-	return (count);
-}
-
-static int count_mask(struct sockaddr_in6 *m)
-{
-	struct in6_addr *in6 = &m->sin6_addr;
-	int i;
-	int count = 0;
-
-	for (i = 0; i < 16; ++i) {
-		count += countbits(in6->s6_addr[i]);
-	}
-	return count;
-}
 
 static void cleanup(void)
 {
