@@ -362,30 +362,29 @@ v6addrlist	: IPV6ADDR ';'
 
 prefixdef	: prefixhead optional_prefixplist ';'
 		{
-				if (prefix->AdvPreferredLifetime > prefix->AdvValidLifetime)
-				{
-					flog(LOG_ERR, "AdvValidLifeTime must be "
-						"greater than AdvPreferredLifetime in %s, line %d",
-						filename, num_lines);
-					ABORT;
-				}
+			if (prefix->AdvPreferredLifetime > prefix->AdvValidLifetime) {
+				flog(LOG_ERR, "AdvValidLifeTime must be "
+					"greater than AdvPreferredLifetime in %s, line %d",
+					filename, num_lines);
+				ABORT;
+			}
 
-				if ( prefix->if6[0] && prefix->if6to4[0]) {
-					flog(LOG_ERR, "Base6Interface and Base6to4Interface are mutually exclusive at this time");
-					ABORT;
-				}
+			if (prefix->if6[0] && prefix->if6to4[0]) {
+				flog(LOG_ERR, "Base6Interface and Base6to4Interface are mutually exclusive at this time");
+				ABORT;
+			}
 
-				if ( prefix->if6[0] ) {
+			if (prefix->if6[0]) {
 #ifndef HAVE_IFADDRS_H
-					flog(LOG_ERR, "Base6Interface not supported in %s, line %d", filename, num_lines);
-					ABORT;
+				flog(LOG_ERR, "Base6Interface not supported in %s, line %d", filename, num_lines);
+				ABORT;
 #endif
 
-					if (prefix->PrefixLen != 64) {
-						flog(LOG_ERR, "only /64 is allowed with Base6Interface.  %s:%d", filename, num_lines);
-						ABORT;
-					}
+				if (prefix->PrefixLen != 64) {
+					flog(LOG_ERR, "only /64 is allowed with Base6Interface.  %s:%d", filename, num_lines);
+					ABORT;
 				}
+			}
 
 			$$ = prefix;
 			prefix = NULL;
@@ -434,46 +433,45 @@ prefixplist	: prefixplist prefixparms
 
 prefixparms	: T_AdvOnLink SWITCH ';'
 		{
-					prefix->AdvOnLinkFlag = $2;
+			prefix->AdvOnLinkFlag = $2;
 		}
 		| T_AdvAutonomous SWITCH ';'
 		{
-					prefix->AdvAutonomousFlag = $2;
+			prefix->AdvAutonomousFlag = $2;
 		}
 		| T_AdvRouterAddr SWITCH ';'
 		{
-					prefix->AdvRouterAddr = $2;
+			prefix->AdvRouterAddr = $2;
 		}
 		| T_AdvValidLifetime number_or_infinity ';'
 		{
-					prefix->AdvValidLifetime = $2;
-					prefix->curr_validlft = $2;
+			prefix->AdvValidLifetime = $2;
+			prefix->curr_validlft = $2;
 		}
 		| T_AdvPreferredLifetime number_or_infinity ';'
 		{
-					prefix->AdvPreferredLifetime = $2;
-					prefix->curr_preferredlft = $2;
+			prefix->AdvPreferredLifetime = $2;
+			prefix->curr_preferredlft = $2;
 		}
 		| T_DeprecatePrefix SWITCH ';'
 		{
-				prefix->DeprecatePrefixFlag = $2;
+			prefix->DeprecatePrefixFlag = $2;
 		}
 		| T_DecrementLifetimes SWITCH ';'
 		{
-				prefix->DecrementLifetimesFlag = $2;
+			prefix->DecrementLifetimesFlag = $2;
 		}
 		| T_Base6Interface name ';'
 		{
-				dlog(LOG_DEBUG, 4, "using prefixes on interface %s for prefixes on interface %s", $2, iface->props.name);
-				strncpy(prefix->if6, $2, IFNAMSIZ-1);
-				prefix->if6[IFNAMSIZ-1] = '\0';
+			dlog(LOG_DEBUG, 4, "using prefixes on interface %s for prefixes on interface %s", $2, iface->props.name);
+			strncpy(prefix->if6, $2, IFNAMSIZ-1);
+			prefix->if6[IFNAMSIZ-1] = '\0';
 		}
-
 		| T_Base6to4Interface name ';'
 		{
-				dlog(LOG_DEBUG, 4, "using interface %s for 6to4 prefixes on interface %s", $2, iface->props.name);
-				strncpy(prefix->if6to4, $2, IFNAMSIZ-1);
-				prefix->if6to4[IFNAMSIZ-1] = '\0';
+			dlog(LOG_DEBUG, 4, "using interface %s for 6to4 prefixes on interface %s", $2, iface->props.name);
+			strncpy(prefix->if6to4, $2, IFNAMSIZ-1);
+			prefix->if6to4[IFNAMSIZ-1] = '\0';
 		}
 		;
 
@@ -496,8 +494,7 @@ routehead	: T_ROUTE IPV6ADDR '/' NUMBER
 
 			route_init_defaults(route, iface);
 
-			if ($4 > MAX_PrefixLen)
-			{
+			if ($4 > MAX_PrefixLen) {
 				flog(LOG_ERR, "invalid route prefix length in %s, line %d", filename, num_lines);
 				ABORT;
 			}
@@ -769,8 +766,7 @@ abrodef		: abrohead  '{' optional_abroplist '}' ';'
 
 abrohead	: T_ABRO IPV6ADDR '/' NUMBER
 		{
-			if ($4 > MAX_PrefixLen)
-			{
+			if ($4 > MAX_PrefixLen) {
 				flog(LOG_ERR, "invalid abro prefix length in %s, line %d", filename, num_lines);
 				ABORT;
 			}
