@@ -292,11 +292,10 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 		}
 #endif /* ifndef HAVE_IFADDRS_H */
 
-#if 0
 		if ( prefix->if6to4[0] ) {
 			unsigned int dst;
 			if (get_v4addr(prefix->if6to4, &dst) < 0) {
-				flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", prefix->if6to4 );
+				flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", prefix->if6to4);
 				prefix->enabled = 0;
 			} else {
 				*((uint16_t *)(prefix->Prefix.s6_addr)) = htons(0x2002);
@@ -304,6 +303,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 			}
 		}
 
+#if 0
 #ifndef HAVE_IFADDRS_H
 		if ( prefix->if6[0] ) {
 			struct ifaddrs *ifap = 0, *ifa = 0;
