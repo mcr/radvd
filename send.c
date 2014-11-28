@@ -227,27 +227,19 @@ static int count_mask(struct sockaddr_in6 *m)
 	return count;
 }
 
-static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
+static struct AdvPrefix * build_prefix_list(struct Interface const * iface, struct AdvPrefix const * iface_prefix_list)
 {
 	struct AdvPrefix * prefix = 0;
 	struct in6_addr zeroaddr;
 	memset(&zeroaddr, 0, sizeof(zeroaddr));
 
-	while (list) {
+	while (iface_prefix_list) {
 
-		struct AdvPrefix * head = malloc(sizeof(struct AdvPrefix));
-		*head = *list;
-		head->next = prefix;
-		prefix = head;
-		list = list->next;
-#if 0
-#ifndef HAVE_IFADDRS_H
+#ifdef HAVE_IFADDRS_H
 		/* ::/64 auto-prefix */
 		if (0 == memcmp(&prefix->Prefix, &zeroaddr, sizeof(struct in6_addr)) && prefix->PrefixLen == 64) {
 			struct ifaddrs *ifap = 0, *ifa = 0;
-			struct AdvPrefix *next = iface->AdvPrefixList;
-
-			dlog(LOG_DEBUG, 5, "all-zeros prefix in %s, line %d", filename, num_lines);
+			struct AdvPrefix *next = prefix;
 
 			if (getifaddrs(&ifap) != 0)
 				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
@@ -276,10 +268,11 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 
 				if (prefix == NULL) {
 					flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
-					ABORT;
+					abort();
 				}
 
 				prefix_init_defaults(prefix);
+				*prefix = *iface_prefix_list;
 				prefix->Prefix = Prefix;
 				prefix->AdvRouterAddr = 1;
 				prefix->next = next;
@@ -289,13 +282,9 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 					prefix->PrefixLen = count_mask(mask);
 
 				if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
-					flog(LOG_ERR, "%s: inet_ntop failed in %s, line %d!", ifa->ifa_name, filename, num_lines);
+					flog(LOG_ERR, "%s: inet_ntop failed", ifa->ifa_name);
 				else
 					dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s", buf, prefix->PrefixLen, ifa->ifa_name);
-			}
-
-			if (!prefix) {
-				flog(LOG_WARNING, "no auto-selected prefix on interface %s, disabling advertisements",  iface->props.name);
 			}
 
 			if (ifap)
@@ -303,6 +292,7 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 		}
 #endif /* ifndef HAVE_IFADDRS_H */
 
+#if 0
 		if ( prefix->if6to4[0] ) {
 			unsigned int dst;
 			if (get_v4addr(prefix->if6to4, &dst) < 0) {
@@ -375,11 +365,8 @@ static struct AdvPrefix * build_prefix_list(struct AdvPrefix const * list)
 	return prefix;
 }
 
-static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *iface_prefix, int cease_adv)
+static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, int cease_adv)
 {
-	struct AdvPrefix * prefix_list = build_prefix_list(iface_prefix);
-	struct AdvPrefix * prefix = prefix_list;
-
 	while (prefix) {
 		if (prefix->enabled && (!prefix->DecrementLifetimesFlag || prefix->curr_preferredlft > 0)) {
 			struct nd_opt_prefix_info pinfo;
@@ -411,8 +398,6 @@ static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *iface_pr
 
 		prefix = prefix->next;
 	}
-
-	free_prefix_list(prefix_list);
 }
 
 
@@ -764,7 +749,9 @@ static void build_ra(struct safe_buffer * sb, struct Interface const * iface)
 	add_ra_header(sb, &iface->ra_header_info, iface->state_info.cease_adv);
 
 	if (iface->AdvPrefixList) {
-		add_prefix(sb, iface->AdvPrefixList, iface->state_info.cease_adv);
+		struct AdvPrefix * prefix_list = build_prefix_list(iface, iface->AdvPrefixList);
+		add_prefix(sb, prefix_list, iface->state_info.cease_adv);
+		free_prefix_list(prefix_list);
 	}
 
 	if (iface->AdvRouteList) {
