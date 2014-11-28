@@ -303,8 +303,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 			}
 		}
 
-#if 0
-#ifndef HAVE_IFADDRS_H
+#ifdef HAVE_IFADDRS_H
 		if ( prefix->if6[0] ) {
 			struct ifaddrs *ifap = 0, *ifa = 0;
 			struct AdvPrefix *next = prefix->next;
@@ -343,7 +342,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				prefix->next = next;
 
 				if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
-					flog(LOG_ERR, "%s: inet_ntop failed in %s, line %d!", ifa->ifa_name, filename, num_lines);
+					flog(LOG_ERR, "%s: inet_ntop failed", ifa->ifa_name);
 				else
 					dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s from interface %s",
 						buf, prefix->PrefixLen, iface->props.name, ifa->ifa_name);
@@ -357,9 +356,6 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				freeifaddrs(ifap);
 		}
 #endif /* ifndef HAVE_IFADDRS_H */
-#endif
-
-
 	}
 
 	return prefix;
