@@ -23,6 +23,7 @@ static int ensure_iface_setup(int sock, struct Interface *iface);
 static int really_send(int sock, struct in6_addr const *dest, struct properties const *props, struct safe_buffer const *sb);
 static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest);
 static size_t serialize_domain_names(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl);
+static struct AdvPrefix * new_prefix(void);
 static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
 static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo);
 static void add_dnssl(struct safe_buffer * sb, struct AdvDNSSL const *dnssl, int cease_adv);
@@ -225,6 +226,20 @@ static int count_mask(struct sockaddr_in6 *m)
 		count += countbits(in6->s6_addr[i]);
 	}
 	return count;
+}
+
+static struct AdvPrefix * new_prefix(void)
+{
+	struct AdvPrefix * prefix = malloc(sizeof(struct AdvPrefix));
+
+	if (prefix == NULL) {
+		flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
+		abort();
+	}
+
+	prefix_init_defaults(prefix);
+
+	return prefix;
 }
 
 static struct AdvPrefix * build_prefix_list(struct Interface const * iface, struct AdvPrefix const * iface_prefix_list)
