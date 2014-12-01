@@ -318,7 +318,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 #ifdef HAVE_IFADDRS_H
 		if ( prefix->if6[0] ) {
 			struct ifaddrs *ifap = 0, *ifa = 0;
-			struct AdvPrefix *next = prefix->next;
+			struct AdvPrefix *next;
 
 			if (getifaddrs(&ifap) != 0)
 				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
@@ -327,6 +327,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				struct sockaddr_in6 *s6 = 0;
 				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
 				struct in6_addr base6prefix;
+				struct in6_addr if6prefix;
 				char buf[INET6_ADDRSTRLEN];
 				int i;
 
@@ -342,14 +343,22 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 					continue;
 
 				base6prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-				if (search_prefix_list(next, base6prefix))
-					continue;
 
 				for (i = 0; i < 8; ++i) {
-					prefix->Prefix.s6_addr[i] &= ~mask->sin6_addr.s6_addr[i];
-					prefix->Prefix.s6_addr[i] |= base6prefix.s6_addr[i];
+					if6prefix.s6_addr[i] &= ~mask->sin6_addr.s6_addr[i];
+					if6prefix.s6_addr[i] |= base6prefix.s6_addr[i];
 				}
-				memset(&prefix->Prefix.s6_addr[8], 0, 8);
+				memset(&if6prefix.s6_addr[8], 0, 8);
+
+				if (search_prefix_list(next, if6prefix))
+					continue;
+
+				next = prefix;
+				prefix = new_prefix();
+				*prefix = *iface_prefix_list;
+				for (i = 0; i < 16; ++i) {
+					prefix->Prefix.s6_addr[i] = if6prefix.s6_addr[i];
+				}
 				prefix->AdvRouterAddr = 1;
 				prefix->next = next;
 
