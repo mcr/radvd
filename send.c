@@ -248,7 +248,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 	struct in6_addr zeroaddr;
 	memset(&zeroaddr, 0, sizeof(zeroaddr));
 
-	while (iface_prefix_list) {
+	if (iface_prefix_list) do {
 
 #ifdef HAVE_IFADDRS_H
 		/* ::/64 auto-prefix */
@@ -368,7 +368,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				freeifaddrs(ifap);
 		}
 #endif /* ifndef HAVE_IFADDRS_H */
-	}
+	} while (iface_prefix_list = iface_prefix_list->next, iface_prefix_list);
 
 	return prefix;
 }
