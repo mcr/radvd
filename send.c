@@ -254,7 +254,6 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 		/* ::/64 auto-prefix */
 		if (0 == memcmp(&prefix->Prefix, &zeroaddr, sizeof(struct in6_addr)) && prefix->PrefixLen == 64) {
 			struct ifaddrs *ifap = 0, *ifa = 0;
-			struct AdvPrefix *next = prefix;
 
 			if (getifaddrs(&ifap) != 0)
 				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
@@ -276,22 +275,16 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 					continue;
 
 				struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-				if (search_prefix_list(next, Prefix))
+				if (search_prefix_list(prefix, Prefix))
 					continue;
 
-				prefix = malloc(sizeof(struct AdvPrefix));
+				struct AdvPrefix *next = prefix;
+				prefix = new_prefix();
+				prefix->next = next;
 
-				if (prefix == NULL) {
-					flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
-					abort();
-				}
-
-				prefix_init_defaults(prefix);
 				*prefix = *iface_prefix_list;
 				prefix->Prefix = Prefix;
 				prefix->AdvRouterAddr = 1;
-				prefix->next = next;
-				next = prefix;
 
 				if (prefix->PrefixLen == 0)
 					prefix->PrefixLen = count_mask(mask);
@@ -308,6 +301,10 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 #endif /* ifndef HAVE_IFADDRS_H */
 
 		if ( prefix->if6to4[0] ) {
+			struct AdvPrefix *next = prefix;
+			prefix = new_prefix();
+			prefix->next = next;
+
 			unsigned int dst;
 			if (get_v4addr(prefix->if6to4, &dst) < 0) {
 				flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", prefix->if6to4);
