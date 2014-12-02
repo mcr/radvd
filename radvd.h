@@ -273,7 +273,6 @@ int setup_linklocal_addr(struct Interface *);
 int setup_linklocal_addr(struct Interface *iface);
 int update_device_index(struct Interface *iface);
 int update_device_info(int sock, struct Interface *);
-struct AdvPrefix const * search_prefix_list(struct AdvPrefix const * list, struct in6_addr);
 
 /* interface.c */
 int check_iface(struct Interface *);
@@ -313,7 +312,7 @@ size_t safe_buffer_pad(struct safe_buffer * sb, size_t count);
 ssize_t readn(int fd, void *buf, size_t count);
 ssize_t writen(int fd, const void *buf, size_t count);
 struct safe_buffer * new_safe_buffer(void);
-void addrtostr(struct in6_addr *, char *, size_t);
+void addrtostr(struct in6_addr const *, char *, size_t);
 void safe_buffer_free(struct safe_buffer * sb);
 
 /* privsep.c */

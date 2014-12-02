@@ -390,13 +390,4 @@ void free_ifaces(struct Interface *ifaces)
 	free_iface_list(ifaces);
 }
 
-struct AdvPrefix const * search_prefix_list(struct AdvPrefix const * list, struct in6_addr Prefix)
-{
-	for (; list; list = list->next) {
-		if (0 == memcmp(&list->Prefix, &Prefix, sizeof(Prefix))) {
-			return list;
-		}
-	}
-	return 0;
-}
 
