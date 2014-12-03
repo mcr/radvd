@@ -257,6 +257,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 	struct AdvPrefix * prefix = 0;
 	struct in6_addr zeroaddr;
 	memset(&zeroaddr, 0, sizeof(zeroaddr));
+	char pfx_str[INET6_ADDRSTRLEN];
 
 	if (iface_prefix_list) do {
 
@@ -272,7 +273,6 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 				struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
-				char buf[INET6_ADDRSTRLEN];
 
 				if (strncmp(ifa->ifa_name, iface->props.name, IFNAMSIZ))
 					continue;
@@ -286,7 +286,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 					continue;
 
 				struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-				if (search_prefix_list(prefix, Prefix, 64))
+				if (search_prefix_list(prefix, Prefix, count_mask(mask)))
 					continue;
 
 				struct AdvPrefix *next = prefix;
@@ -294,24 +294,20 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				*prefix = *iface_prefix_list;
 				prefix->next = next;
 				prefix->Prefix = Prefix;
-				prefix->AdvRouterAddr = 1;
+				prefix->PrefixLen = count_mask(mask);
 
-				if (prefix->PrefixLen == 0)
-					prefix->PrefixLen = count_mask(mask);
-
-				if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
-					flog(LOG_ERR, "%s: inet_ntop failed", ifa->ifa_name);
-				else
-					dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s", buf, prefix->PrefixLen, ifa->ifa_name);
+				addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+				dlog(LOG_DEBUG, 4, "auto-selected prefix %s/%d on interface %s",
+					pfx_str, prefix->PrefixLen, ifa->ifa_name);
 			}
 
 			if (ifap)
 				freeifaddrs(ifap);
 		}
 
-		if ( prefix->if6[0] ) {
+		if ( iface_prefix_list->if6[0] ) {
 			struct ifaddrs *ifap = 0, *ifa = 0;
-			struct AdvPrefix *next;
+			struct AdvPrefix *next = 0;
 
 			if (getifaddrs(&ifap) != 0)
 				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
@@ -321,10 +317,9 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
 				struct in6_addr base6prefix;
 				struct in6_addr if6prefix;
-				char buf[INET6_ADDRSTRLEN];
 				int i;
 
-				if (strncmp(ifa->ifa_name, prefix->if6, IFNAMSIZ))
+				if (strncmp(ifa->ifa_name, iface_prefix_list->if6, IFNAMSIZ))
 					continue;
 
 				if (ifa->ifa_addr->sa_family != AF_INET6)
@@ -343,7 +338,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				}
 				memset(&if6prefix.s6_addr[8], 0, 8);
 
-				if (search_prefix_list(next, if6prefix, 64))
+				if (search_prefix_list(prefix, if6prefix, count_mask(mask)))
 					continue;
 
 				next = prefix;
@@ -352,18 +347,12 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				for (i = 0; i < 16; ++i) {
 					prefix->Prefix.s6_addr[i] = if6prefix.s6_addr[i];
 				}
-				prefix->AdvRouterAddr = 1;
+				prefix->PrefixLen = count_mask(mask);
 				prefix->next = next;
 
-				if (inet_ntop(ifa->ifa_addr->sa_family, (void *)&(prefix->Prefix), buf, sizeof(buf)) == NULL)
-					flog(LOG_ERR, "%s: inet_ntop failed", ifa->ifa_name);
-				else
-					dlog(LOG_DEBUG, 3, "auto-selected prefix %s/%d on interface %s from interface %s",
-						buf, prefix->PrefixLen, iface->props.name, ifa->ifa_name);
-
-				/* Taking only one prefix from the Base6Interface.  Taking more than one would require allocating new
-				   prefixes and building a list.  I'm not sure how to do that from here. So for now, break. */
-				break;
+				addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+				dlog(LOG_DEBUG, 4, "auto-selected Base6 prefix %s/%d on interface %s from interface %s",
+					pfx_str, prefix->PrefixLen, iface->props.name, ifa->ifa_name);
 			}
 
 			if (ifap)
@@ -371,19 +360,26 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 		}
 #endif /* ifndef HAVE_IFADDRS_H */
 
-		if ( prefix->if6to4[0] ) {
-			struct AdvPrefix *next = prefix;
-			prefix = new_prefix();
-			*prefix = *iface_prefix_list;
-			prefix->next = next;
-
+		if ( iface_prefix_list->if6to4[0] ) {
 			unsigned int dst;
-			if (get_v4addr(prefix->if6to4, &dst) < 0) {
-				flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", prefix->if6to4);
-				prefix->enabled = 0;
+			if (get_v4addr(iface_prefix_list->if6to4, &dst) < 0) {
+				flog(LOG_ERR, "interface %s has no IPv4 addresses, disabling 6to4 prefix", iface_prefix_list->if6to4);
 			} else {
-				*((uint16_t *)(prefix->Prefix.s6_addr)) = htons(0x2002);
-				memcpy( prefix->Prefix.s6_addr + 2, &dst, sizeof( dst ) );
+				struct in6_addr foo;
+				memset(&foo, 0, sizeof(foo));
+				*((uint16_t *)(foo.s6_addr)) = htons(0x2002);
+				memcpy(foo.s6_addr + 2, &dst, sizeof( dst ) );
+				if (!search_prefix_list(prefix, foo, 64)) {
+					struct AdvPrefix *next = prefix;
+					prefix = new_prefix();
+					*prefix = *iface_prefix_list;
+					prefix->next = next;
+					prefix->Prefix = foo;
+					prefix->PrefixLen = 64;
+					addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+					dlog(LOG_DEBUG, 4, "auto-selected Base6to4 prefix %s/%d on interface %s from interface %s",
+						pfx_str, prefix->PrefixLen, iface->props.name, prefix->if6to4);
+				}
 			}
 		}
 

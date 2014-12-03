@@ -78,8 +78,6 @@ int get_v4addr(const char *ifn, unsigned int *dst)
 
 	struct sockaddr_in *addr = (struct sockaddr_in *)(&ifr.ifr_addr);
 
-	dlog(LOG_DEBUG, 3, "%s IPv4 address is: %s", ifn, inet_ntoa(addr->sin_addr));
-
 	*dst = addr->sin_addr.s_addr;
 
 	close(fd);
