@@ -17,8 +17,6 @@
 #include "includes.h"
 #include "radvd.h"
 
-static int count_mask(struct sockaddr_in6 *m);
-static int countbits(int b);
 static int ensure_iface_setup(int sock, struct Interface *iface);
 static int really_send(int sock, struct in6_addr const *dest, struct properties const *props, struct safe_buffer const *sb);
 static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest);
@@ -205,29 +203,6 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 	return prefix;
 }
 
-static int countbits(int b)
-{
-	int count;
-
-	for (count = 0; b != 0; count++) {
-		b &= b - 1; // this clears the LSB-most set bit
-	}
-
-	return (count);
-}
-
-static int count_mask(struct sockaddr_in6 *m)
-{
-	struct in6_addr *in6 = &m->sin6_addr;
-	int i;
-	int count = 0;
-
-	for (i = 0; i < 16; ++i) {
-		count += countbits(in6->s6_addr[i]);
-	}
-	return count;
-}
-
 static struct AdvPrefix * new_prefix(void)
 {
 	struct AdvPrefix * prefix = malloc(sizeof(struct AdvPrefix));
@@ -286,7 +261,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 					continue;
 
 				struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-				if (search_prefix_list(prefix, Prefix, count_mask(mask)))
+				if (search_prefix_list(prefix, Prefix, 64))
 					continue;
 
 				struct AdvPrefix *next = prefix;
@@ -294,7 +269,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				*prefix = *iface_prefix_list;
 				prefix->next = next;
 				prefix->Prefix = Prefix;
-				prefix->PrefixLen = count_mask(mask);
+				prefix->PrefixLen = 64;
 
 				addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
 				dlog(LOG_DEBUG, 4, "auto-selected prefix %s/%d on interface %s",
@@ -338,7 +313,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				}
 				memset(&if6prefix.s6_addr[8], 0, 8);
 
-				if (search_prefix_list(prefix, if6prefix, count_mask(mask)))
+				if (search_prefix_list(prefix, if6prefix, 64))
 					continue;
 
 				next = prefix;
@@ -347,7 +322,7 @@ static struct AdvPrefix * build_prefix_list(struct Interface const * iface, stru
 				for (i = 0; i < 16; ++i) {
 					prefix->Prefix.s6_addr[i] = if6prefix.s6_addr[i];
 				}
-				prefix->PrefixLen = count_mask(mask);
+				prefix->PrefixLen = 64;
 				prefix->next = next;
 
 				addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
