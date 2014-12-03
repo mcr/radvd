@@ -369,9 +369,14 @@ prefixdef	: prefixhead optional_prefixplist ';'
 				ABORT;
 			}
 
-			if (prefix->if6[0] && prefix->if6to4[0]) {
-				flog(LOG_ERR, "Base6Interface and Base6to4Interface are mutually exclusive at this time");
+			struct in6_addr zeroaddr;
+			memset(&zeroaddr, 0, sizeof(zeroaddr));
+			if (0 == memcmp(&prefix->Prefix, &zeroaddr, sizeof(struct in6_addr)) && prefix->PrefixLen == 64) {
+#ifndef HAVE_IFADDRS_H
+				flog(LOG_ERR, "Autoselecting prefix not supported in %s, line %d", filename, num_lines);
 				ABORT;
+#endif
+				prefix->AdvRouterAddr = 1;
 			}
 
 			if (prefix->if6[0]) {
@@ -382,6 +387,13 @@ prefixdef	: prefixhead optional_prefixplist ';'
 
 				if (prefix->PrefixLen != 64) {
 					flog(LOG_ERR, "only /64 is allowed with Base6Interface.  %s:%d", filename, num_lines);
+					ABORT;
+				}
+			}
+
+			if (prefix->if6to4[0]) {
+				if (prefix->PrefixLen != 64) {
+					flog(LOG_ERR, "only /64 is allowed with Base6to4Interface.  %s:%d", filename, num_lines);
 					ABORT;
 				}
 			}
