@@ -54,8 +54,8 @@ Special prefix "::/64" is also supported on systems that implement getifaddrs()
 (on other systems, configuration activation fails and radvd exits).
 When configured, radvd
 picks all non-link-local prefix assigned to the interface and starts advertising
-it.  This may be applicable in non-6to4 scenarios where the upstream prefix might
-change.  This option is incompatible with Base6to4Interface option.
+them.  This may be applicable in non-6to4 scenarios where the upstream prefix might
+change.
 AdvRouterAddr option is always enabled when this configuration is used.
 
 All the possible prefix specific options are described below.  Each
@@ -460,6 +460,8 @@ IPv6 address of the interface specified by
 .B name.  
 The resulting prefix length will be 64.
 
+Default: Base6Interface is not used
+
 .TP
 .BR "Base6to4Interface " name 
 
@@ -474,12 +476,7 @@ address assigned to interface
 .B name
 at configuration time. The remaining 80 bits of the prefix (including
 the SLA ID) will be advertised as specified in the configuration file.
-See the next section for an example.
-
-If interface
-.B name
-is not available at configuration time, a warning will be written to
-the log and this prefix will be disabled until radvd is reconfigured.
+The resulting prefix length will be 64.
 
 This option enables systems with dynamic IPv4 addresses to update their
 advertised 6to4 prefixes simply by restarting radvd or sending a SIGHUP
@@ -492,9 +489,11 @@ and
 .B AdvPreferredLifetime
 options).
 
+See the next section for an example.
+
 For more information on 6to4, see RFC 3056.
 
-Default: 6to4 is not used
+Default: Base6to4Interface is not used
 
 .SH ROUTE SPECIFIC OPTIONS
 
