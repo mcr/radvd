@@ -8,6 +8,15 @@
  * http://entrenchant.blogspot.com/2010/08/unit-testing-in-c.html
  */
 
+int getaddrs(struct ifaddrs **ifap)
+{
+	return 0;
+}
+
+void freeaddrs(struct ifaddrs *ifa)
+{
+}
+
 START_TEST (test_decrement_lifetime)
 {
 	uint32_t lifetime = 10;

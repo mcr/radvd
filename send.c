@@ -39,7 +39,10 @@ static void decrement_lifetime(const time_t secs, uint32_t * lifetime);
 static void update_iface_times(struct Interface * iface);
 
 #ifdef UNIT_TEST
-#include "test/send.c"
+# include "test/send.c"
+#else
+# define getaddrs getifaddrs
+# define freeaddrs freeifaddrs
 #endif
 
 
@@ -239,7 +242,7 @@ static struct AdvPrefix * build_zero_prefix_list(struct AdvPrefix * prefix, stru
 	    && iface_prefix_list->PrefixLen == 64) {
 		struct ifaddrs *ifap = 0, *ifa = 0;
 
-		if (getifaddrs(&ifap) != 0)
+		if (getaddrs(&ifap) != 0)
 			flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
 
 		for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -275,7 +278,7 @@ static struct AdvPrefix * build_zero_prefix_list(struct AdvPrefix * prefix, stru
 		}
 
 		if (ifap)
-			freeifaddrs(ifap);
+			freeaddrs(ifap);
 	}
 #endif
 	return prefix;
@@ -288,7 +291,7 @@ static struct AdvPrefix * build_if6_prefix_list(struct AdvPrefix * prefix, struc
 		struct ifaddrs *ifap = 0, *ifa = 0;
 		struct AdvPrefix *next = 0;
 
-		if (getifaddrs(&ifap) != 0)
+		if (getaddrs(&ifap) != 0)
 			flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
 
 		for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -336,7 +339,7 @@ static struct AdvPrefix * build_if6_prefix_list(struct AdvPrefix * prefix, struc
 		}
 
 		if (ifap)
-			freeifaddrs(ifap);
+			freeaddrs(ifap);
 	}
 #endif /* ifndef HAVE_IFADDRS_H */
 	return prefix;
