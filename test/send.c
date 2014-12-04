@@ -458,6 +458,9 @@ END_TEST
 
 Suite * send_suite(void)
 {
+	set_debuglevel(5);
+	log_open(L_STDERR, "test", 0, 0);
+
 	TCase * tc_update = tcase_create("update");
 	tcase_add_test(tc_update, test_decrement_lifetime);
 
