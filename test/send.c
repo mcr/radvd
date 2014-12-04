@@ -18,7 +18,22 @@ START_TEST (test_decrement_lifetime)
 }
 END_TEST
 
+static struct Interface * iface_auto = 0;
 static struct Interface * iface = 0;
+
+static void iface_setup_auto(void)
+{
+	ck_assert_ptr_eq(0, iface_auto);
+	iface_auto = readin_config("test/test1_auto.conf");
+	ck_assert_ptr_ne(0, iface_auto);
+}
+
+static void iface_teardown_auto(void)
+{
+	ck_assert_ptr_ne(0, iface_auto);
+	free_ifaces(iface_auto);
+	iface_auto = 0;
+}
 
 static void iface_setup(void)
 {
@@ -57,6 +72,39 @@ START_TEST (test_add_ra_header)
 END_TEST
 
 START_TEST (test_add_prefix)
+{
+	ck_assert_ptr_ne(0, iface);
+
+	struct safe_buffer sb = SAFE_BUFFER_INIT;
+	add_prefix(&sb, iface->AdvPrefixList, iface->state_info.cease_adv);
+
+#ifdef PRINT_SAFE_BUFFER
+	print_safe_buffer(&sb);
+#else
+	unsigned char expected[] = {
+		0x03, 0x04, 0x40, 0xe0, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+		0xfe, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x30, 0x80, 0x00, 0x00, 0x27, 0x10,
+		0x00, 0x00, 0x03, 0xe8, 0x00, 0x00, 0x00, 0x00,
+		0xfe, 0x80, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xfe, 0x80, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	ck_assert_int_eq(sizeof(expected), sb.used);
+	ck_assert_int_eq(0, memcmp(expected, sb.buffer, sb.used));
+#endif
+
+	safe_buffer_free(&sb);
+}
+END_TEST
+
+START_TEST (test_add_prefix_zero)
 {
 	ck_assert_ptr_ne(0, iface);
 
@@ -351,6 +399,10 @@ Suite * send_suite(void)
 	TCase * tc_update = tcase_create("update");
 	tcase_add_test(tc_update, test_decrement_lifetime);
 
+	TCase * tc_auto = tcase_create("auto");
+	tcase_add_unchecked_fixture(tc_auto, iface_setup_auto, iface_teardown_auto);
+	tcase_add_test(tc_auto, test_add_prefix_zero);
+
 	TCase * tc_build = tcase_create("build");
 	tcase_add_unchecked_fixture(tc_build, iface_setup, iface_teardown);
 	tcase_add_test(tc_build, test_add_ra_header);
@@ -367,6 +419,7 @@ Suite * send_suite(void)
 	Suite *s = suite_create("send");
 	suite_add_tcase(s, tc_update);
 	suite_add_tcase(s, tc_build);
+	suite_add_tcase(s, tc_auto);
 
 	return s;	
 }

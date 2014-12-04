@@ -57,7 +57,9 @@ int check_device(int sock, struct Interface *iface)
 
 int get_v4addr(const char *ifn, unsigned int *dst)
 {
-
+#ifdef UNIT_TEST
+	*dst = 0xcafef00d;
+#endif
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
 		flog(LOG_ERR, "create socket for IPv4 ioctl failed on %s: %s", ifn, strerror(errno));
