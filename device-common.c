@@ -55,38 +55,6 @@ int check_device(int sock, struct Interface *iface)
 	return 0;
 }
 
-int get_v4addr(const char *ifn, unsigned int *dst)
-{
-#ifdef UNIT_TEST
-	*dst = 0xcafef00d;
-#endif
-	int fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd < 0) {
-		flog(LOG_ERR, "create socket for IPv4 ioctl failed on %s: %s", ifn, strerror(errno));
-		return -1;
-	}
-
-	struct ifreq ifr;
-	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, ifn, IFNAMSIZ - 1);
-	ifr.ifr_name[IFNAMSIZ - 1] = '\0';
-	ifr.ifr_addr.sa_family = AF_INET;
-
-	if (ioctl(fd, SIOCGIFADDR, &ifr) < 0) {
-		flog(LOG_ERR, "ioctl(SIOCGIFADDR) failed on %s: %s", ifn, strerror(errno));
-		close(fd);
-		return -1;
-	}
-
-	struct sockaddr_in *addr = (struct sockaddr_in *)(&ifr.ifr_addr);
-
-	*dst = addr->sin_addr.s_addr;
-
-	close(fd);
-
-	return 0;
-}
-
 /*
  * Saves the first link local address seen on the specified interface to iface->if_addr
  *
