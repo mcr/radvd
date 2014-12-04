@@ -10,6 +10,55 @@
 
 int getaddrs(struct ifaddrs **ifap)
 {
+	static struct ifaddrs ifa[8];
+	static struct sockaddr_in6 addrs[8];
+
+	memset(addrs, 0, sizeof(addrs));
+
+	inet_pton(AF_INET6, "fe80:abcd:a123::1", &addrs[0].sin6_addr);
+	addrs[0].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "fe80:abcd:a123::2", &addrs[1].sin6_addr);
+	addrs[1].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "2001:abcd:a123::3", &addrs[2].sin6_addr);
+	addrs[2].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "2605:abcd:a123::4", &addrs[3].sin6_addr);
+	addrs[3].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "fe80:abcd:ef01::1", &addrs[4].sin6_addr);
+	addrs[4].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "fe80:abcd:ef01::2", &addrs[5].sin6_addr);
+	addrs[5].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "2001:abcd:ef01::3", &addrs[6].sin6_addr);
+	addrs[6].sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "2001:abcd:ef01::4", &addrs[7].sin6_addr);
+	addrs[7].sin6_family = AF_INET6;
+
+	memset(ifa, 0, sizeof(ifa));
+
+	ifa[0].ifa_next = &ifa[1];
+	ifa[0].ifa_name = "fake0";
+	ifa[0].ifa_addr = (struct sockaddr*)&addrs[0];
+	ifa[1].ifa_next = &ifa[2];
+	ifa[1].ifa_name = "fake0";
+	ifa[1].ifa_addr = (struct sockaddr*)&addrs[1];
+	ifa[2].ifa_next = &ifa[3];
+	ifa[2].ifa_name = "fake0";
+	ifa[2].ifa_addr = (struct sockaddr*)&addrs[2];
+	ifa[3].ifa_next = &ifa[4];
+	ifa[3].ifa_name = "fake0";
+	ifa[3].ifa_addr = (struct sockaddr*)&addrs[3];
+	ifa[4].ifa_next = &ifa[5];
+	ifa[4].ifa_name = "fake1";
+	ifa[4].ifa_addr = (struct sockaddr*)&addrs[4];
+	ifa[5].ifa_next = &ifa[6];
+	ifa[5].ifa_name = "fake1";
+	ifa[5].ifa_addr = (struct sockaddr*)&addrs[5];
+	ifa[6].ifa_next = &ifa[7];
+	ifa[6].ifa_name = "fake1";
+	ifa[6].ifa_addr = (struct sockaddr*)&addrs[6];
+	ifa[7].ifa_next = 0;
+	ifa[7].ifa_name = "fake1";
+	ifa[7].ifa_addr = (struct sockaddr*)&addrs[7];
+
 	return 0;
 }
 
@@ -113,28 +162,32 @@ START_TEST (test_add_prefix)
 }
 END_TEST
 
-START_TEST (test_add_prefix_zero)
+START_TEST (test_add_prefix_auto)
 {
-	ck_assert_ptr_ne(0, iface);
+	ck_assert_ptr_ne(0, iface_auto);
 
 	struct safe_buffer sb = SAFE_BUFFER_INIT;
-	add_prefix(&sb, iface->AdvPrefixList, iface->state_info.cease_adv);
+	add_prefix(&sb, iface_auto->AdvPrefixList, iface_auto->state_info.cease_adv);
 
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
 #else
 	unsigned char expected[] = {
-		0x03, 0x04, 0x40, 0xe0, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
-		0xfe, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xe0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x30, 0x80, 0x00, 0x00, 0x27, 0x10,
-		0x00, 0x00, 0x03, 0xe8, 0x00, 0x00, 0x00, 0x00,
-		0xfe, 0x80, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
 		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xfe, 0x80, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x44,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x66,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x64, 0x64,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 
@@ -410,7 +463,7 @@ Suite * send_suite(void)
 
 	TCase * tc_auto = tcase_create("auto");
 	tcase_add_unchecked_fixture(tc_auto, iface_setup_auto, iface_teardown_auto);
-	tcase_add_test(tc_auto, test_add_prefix_zero);
+	tcase_add_test(tc_auto, test_add_prefix_auto);
 
 	TCase * tc_build = tcase_create("build");
 	tcase_add_unchecked_fixture(tc_build, iface_setup, iface_teardown);
