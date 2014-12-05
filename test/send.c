@@ -51,13 +51,13 @@ int getaddrs(struct ifaddrs **ifap)
 			break;
 
 		case 1:
-			inet_pton(AF_INET6, "2345:1234:5678::1", &addrs[i].sin6_addr);
+			inet_pton(AF_INET6, "2001:1234:5678::1", &addrs[i].sin6_addr);
 			addrs[i].sin6_addr.s6_addr[7] += i+1;
 			addrs[i].sin6_family = AF_INET6;
 			break;
 
 		default:
-			inet_pton(AF_INET6, "3210:1234:5678::1", &addrs[i].sin6_addr);
+			inet_pton(AF_INET6, "2010:1234:5678::1", &addrs[i].sin6_addr);
 			addrs[i].sin6_addr.s6_addr[7] += i;
 			addrs[i].sin6_family = AF_INET6;
 			break;
@@ -78,6 +78,7 @@ int getaddrs(struct ifaddrs **ifap)
 		printf("%s [%s]\n", ifa[i].ifa_name, dst);
 	}
 #endif
+	*ifap = ifa;
 	return 0;
 }
 
