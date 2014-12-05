@@ -235,62 +235,65 @@ static struct AdvPrefix * build_zero_prefix_list(struct AdvPrefix * prefix, stru
 {
 #ifdef HAVE_IFADDRS_H
 	dlog(LOG_DEBUG, 5, "building zero-prefix auto-selected lists");
-	struct in6_addr zeroaddr;
-	memset(&zeroaddr, 0, sizeof(zeroaddr));
 
-	/* ::/64 auto-prefix */
 	struct AdvPrefix *AdvPrefixList = iface->AdvPrefixList;
-	if (AdvPrefixList) do {
-		if (0 == memcmp(&AdvPrefixList->Prefix, &zeroaddr, sizeof(struct in6_addr))
-		    && AdvPrefixList->PrefixLen == 64) {
-			dlog(LOG_DEBUG, 5, "-10");
-			struct ifaddrs *ifap = 0, *ifa = 0;
+	if (AdvPrefixList) {
+		struct ifaddrs *ifap = 0;
+		struct in6_addr zeroaddr;
+		memset(&zeroaddr, 0, sizeof(zeroaddr));
 
-			if (getaddrs(&ifap) != 0)
-				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
+		do {
+			if (AdvPrefixList->PrefixLen == 64 && 0 == memcmp(&AdvPrefixList->Prefix, &zeroaddr, sizeof(struct in6_addr))) {
 
-			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-				if (strncmp(ifa->ifa_name, iface->props.name, IFNAMSIZ)) {
-					dlog(LOG_DEBUG, 5, "-1");
-					continue;
+				if (!ifap) {
+					if (0 != getaddrs(&ifap)) {
+						flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
+						break;
+					}
 				}
 
-				if (ifa->ifa_addr->sa_family != AF_INET6) {
-					dlog(LOG_DEBUG, 5, "-2");
-					continue;
+				for (struct ifaddrs * ifa = ifap; ifa; ifa = ifa->ifa_next) {
+					if (ifa->ifa_addr->sa_family != AF_INET6) {
+						continue;
+					}
+
+					if (strncmp(ifa->ifa_name, iface->props.name, IFNAMSIZ)) {
+						continue;
+					}
+
+					struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
+
+					if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
+						continue;
+					}
+
+					struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
+					struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
+					if (search_prefix_list(prefix, Prefix, 64)) {
+						continue;
+					}
+
+					struct AdvPrefix *next = prefix;
+					prefix = new_prefix();
+					*prefix = *AdvPrefixList;
+					prefix->next = next;
+					prefix->Prefix = Prefix;
+					prefix->PrefixLen = 64;
+
+					char pfx_str[INET6_ADDRSTRLEN];
+					addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+					dlog(LOG_DEBUG, 4, "auto-selected prefix %s/%d on interface %s",
+						pfx_str, prefix->PrefixLen, ifa->ifa_name);
 				}
-
-				struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
-
-				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
-					dlog(LOG_DEBUG, 5, "-3");
-					continue;
-				}
-
-				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
-				struct in6_addr Prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-				if (search_prefix_list(prefix, Prefix, 64)) {
-					dlog(LOG_DEBUG, 5, "-4");
-					continue;
-				}
-
-				struct AdvPrefix *next = prefix;
-				prefix = new_prefix();
-				*prefix = *AdvPrefixList;
-				prefix->next = next;
-				prefix->Prefix = Prefix;
-				prefix->PrefixLen = 64;
-
-				char pfx_str[INET6_ADDRSTRLEN];
-				addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
-				dlog(LOG_DEBUG, 4, "auto-selected prefix %s/%d on interface %s",
-					pfx_str, prefix->PrefixLen, ifa->ifa_name);
 			}
 
-			if (ifap)
-				freeaddrs(ifap);
+		} while (AdvPrefixList = AdvPrefixList->next, AdvPrefixList);
+
+		if (ifap) {
+			freeaddrs(ifap);
 		}
-	} while (AdvPrefixList = AdvPrefixList->next, AdvPrefixList);
+	}
+
 	dlog(LOG_DEBUG, 5, "done building zero-prefix auto-selected lists");
 #endif
 	return prefix;
@@ -300,61 +303,75 @@ static struct AdvPrefix * build_if6_prefix_list(struct AdvPrefix * prefix, struc
 {
 #ifdef HAVE_IFADDRS_H
 	dlog(LOG_DEBUG, 5, "building Base6Interface auto-selected lists");
+
 	struct AdvPrefix *AdvPrefixList = iface->AdvPrefixList;
-	if (AdvPrefixList) do {
-		if ( AdvPrefixList->if6[0] ) {
-			struct ifaddrs *ifap = 0, *ifa = 0;
-			struct AdvPrefix *next = 0;
+	if (AdvPrefixList) {
+		struct ifaddrs *ifap = 0;
+		do {
+			if ( AdvPrefixList->if6[0] ) {
 
-			if (getaddrs(&ifap) != 0)
-				flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
-
-			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-				if (strncmp(ifa->ifa_name, AdvPrefixList->if6, IFNAMSIZ))
-					continue;
-
-				if (ifa->ifa_addr->sa_family != AF_INET6)
-					continue;
-
-				struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
-
-				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr))
-					continue;
-
-				struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
-
-				struct in6_addr base6prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
-
-				struct in6_addr if6prefix;
-				for (int i = 0; i < 8; ++i) {
-					if6prefix.s6_addr[i] &= ~mask->sin6_addr.s6_addr[i];
-					if6prefix.s6_addr[i] |= base6prefix.s6_addr[i];
+				if (!ifap) {
+					if (0 != getaddrs(&ifap)) {
+						flog(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
+						break;
+					}
 				}
-				memset(&if6prefix.s6_addr[8], 0, 8);
 
-				if (search_prefix_list(prefix, if6prefix, 64))
-					continue;
+				for (struct ifaddrs * ifa = ifap; ifa; ifa = ifa->ifa_next) {
+					if (ifa->ifa_addr->sa_family != AF_INET6) {
+						continue;
+					}
 
-				next = prefix;
-				prefix = new_prefix();
-				*prefix = *AdvPrefixList;
-				for (int i = 0; i < 16; ++i) {
-					prefix->Prefix.s6_addr[i] = if6prefix.s6_addr[i];
+					if (strncmp(ifa->ifa_name, AdvPrefixList->if6, IFNAMSIZ)) {
+						continue;
+					}
+
+					struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
+
+					if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
+						continue;
+					}
+
+					struct sockaddr_in6 *mask = (struct sockaddr_in6 *)ifa->ifa_netmask;
+
+					struct in6_addr base6prefix = get_prefix6(&s6->sin6_addr, &mask->sin6_addr);
+
+					struct in6_addr if6prefix;
+					for (int i = 0; i < 8; ++i) {
+						if6prefix.s6_addr[i] &= ~mask->sin6_addr.s6_addr[i];
+						if6prefix.s6_addr[i] |= base6prefix.s6_addr[i];
+					}
+					memset(&if6prefix.s6_addr[8], 0, 8);
+
+					if (search_prefix_list(prefix, if6prefix, 64)) {
+						continue;
+					}
+
+					struct AdvPrefix *next = prefix;
+					prefix = new_prefix();
+					*prefix = *AdvPrefixList;
+					for (int i = 0; i < 16; ++i) {
+						prefix->Prefix.s6_addr[i] = if6prefix.s6_addr[i];
+					}
+					prefix->PrefixLen = 64;
+					prefix->next = next;
+
+					char pfx_str[INET6_ADDRSTRLEN];
+					addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+					dlog(LOG_DEBUG, 4, "auto-selected Base6 prefix %s/%d on interface %s from interface %s",
+						pfx_str, prefix->PrefixLen, iface->props.name, ifa->ifa_name);
 				}
-				prefix->PrefixLen = 64;
-				prefix->next = next;
 
-				char pfx_str[INET6_ADDRSTRLEN];
-				addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
-				dlog(LOG_DEBUG, 4, "auto-selected Base6 prefix %s/%d on interface %s from interface %s",
-					pfx_str, prefix->PrefixLen, iface->props.name, ifa->ifa_name);
 			}
+		} while (AdvPrefixList = AdvPrefixList->next, AdvPrefixList);
 
-			if (ifap)
-				freeaddrs(ifap);
+		if (ifap) {
+			freeaddrs(ifap);
 		}
-	} while (AdvPrefixList = AdvPrefixList->next, AdvPrefixList);
+	}
+
 #endif /* ifndef HAVE_IFADDRS_H */
+
 	return prefix;
 }
 
