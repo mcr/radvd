@@ -345,8 +345,8 @@ static struct AdvPrefix * build_if6_prefix_list(struct AdvPrefix * prefix, struc
 static int get_v4addr(const char *ifn, unsigned int *dst)
 {
 #ifdef UNIT_TEST
-	*dst = 0xcafef00d;
-	return 0;
+	*dst = 0x0df0feca;
+	return 1;
 #endif
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
