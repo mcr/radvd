@@ -17,33 +17,20 @@ int getaddrs(struct ifaddrs **ifap)
 	static struct ifaddrs ifa[631];
 	static struct sockaddr_in6 addrs[countof(ifa)];
 	static struct sockaddr_in6 mask;
-	static char * names[] = {
-		"fake0",
-		"fake1",
-		"fake2",
-		"fake3",
-		"fake4",
-		"fake5",
-		"fake6",
-		"fake7",
-		"fake8",
-		"fake9",
-		"fake10",
-		"fake11",
-		"fake12",
-		"fake13",
-		"fake14",
-		"fake15",
-		"fake16",
-		"fake17",
-		"fake18",
-		"fake19",
-	};
+	static char * names[128] = {0};
 
 	memset(addrs, 0, sizeof(addrs));
 	memset(ifa, 0, sizeof(ifa));
 
 	inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask.sin6_addr);
+
+	if (0 == names[0]) {
+		for (int i = 0; i < countof(names); ++i) {
+			char buffer[IFNAMSIZ];
+			snprintf(buffer, sizeof(buffer), "fake%d", i);
+			names[i] = strdup(buffer);
+		}
+	}
 
 	for (int i = 0; i < countof(ifa); ++i) {
 		switch (i%3) {
