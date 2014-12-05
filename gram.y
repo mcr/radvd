@@ -376,6 +376,7 @@ prefixdef	: prefixhead optional_prefixplist ';'
 				flog(LOG_ERR, "Autoselecting prefix not supported in %s, line %d", filename, num_lines);
 				ABORT;
 #endif
+				dlog(LOG_DEBUG, 4, "%s will use prefixes found in getifaddrs", iface->props.name);
 				prefix->AdvRouterAddr = 1;
 			}
 
@@ -389,6 +390,7 @@ prefixdef	: prefixhead optional_prefixplist ';'
 					flog(LOG_ERR, "only /64 is allowed with Base6Interface.  %s:%d", filename, num_lines);
 					ABORT;
 				}
+				dlog(LOG_DEBUG, 4, "%s will use prefixes on interface %s", iface->props.name, prefix->if6);
 			}
 
 			if (prefix->if6to4[0]) {
@@ -396,6 +398,7 @@ prefixdef	: prefixhead optional_prefixplist ';'
 					flog(LOG_ERR, "only /64 is allowed with Base6to4Interface.  %s:%d", filename, num_lines);
 					ABORT;
 				}
+				dlog(LOG_DEBUG, 4, "%s will use IPv4 addresses on interface %s for 6to4 prefixes", iface->props.name, prefix->if6to4);
 			}
 
 			$$ = prefix;
@@ -475,13 +478,11 @@ prefixparms	: T_AdvOnLink SWITCH ';'
 		}
 		| T_Base6Interface name ';'
 		{
-			dlog(LOG_DEBUG, 4, "using prefixes on interface %s for prefixes on interface %s", $2, iface->props.name);
 			strncpy(prefix->if6, $2, IFNAMSIZ-1);
 			prefix->if6[IFNAMSIZ-1] = '\0';
 		}
 		| T_Base6to4Interface name ';'
 		{
-			dlog(LOG_DEBUG, 4, "using interface %s for 6to4 prefixes on interface %s", $2, iface->props.name);
 			strncpy(prefix->if6to4, $2, IFNAMSIZ-1);
 			prefix->if6to4[IFNAMSIZ-1] = '\0';
 		}
