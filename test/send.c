@@ -8,57 +8,76 @@
  * http://entrenchant.blogspot.com/2010/08/unit-testing-in-c.html
  */
 
+#ifndef countof
+# define countof(x) (sizeof(x)/sizeof(x[0]))
+#endif
+
 int getaddrs(struct ifaddrs **ifap)
 {
-	static struct ifaddrs ifa[8];
-	static struct sockaddr_in6 addrs[8];
+	static struct ifaddrs ifa[631];
+	static struct sockaddr_in6 addrs[countof(ifa)];
+	static char * names[] = {
+		"fake0",
+		"fake1",
+		"fake2",
+		"fake3",
+		"fake4",
+		"fake5",
+		"fake6",
+		"fake7",
+		"fake8",
+		"fake9",
+		"fake10",
+		"fake11",
+		"fake12",
+		"fake13",
+		"fake14",
+		"fake15",
+		"fake16",
+		"fake17",
+		"fake18",
+		"fake19",
+	};
 
 	memset(addrs, 0, sizeof(addrs));
-
-	inet_pton(AF_INET6, "fe80:abcd:a123::1", &addrs[0].sin6_addr);
-	addrs[0].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "fe80:abcd:a123::2", &addrs[1].sin6_addr);
-	addrs[1].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "2001:abcd:a123::3", &addrs[2].sin6_addr);
-	addrs[2].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "2605:abcd:a123::4", &addrs[3].sin6_addr);
-	addrs[3].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "fe80:abcd:ef01::1", &addrs[4].sin6_addr);
-	addrs[4].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "fe80:abcd:ef01::2", &addrs[5].sin6_addr);
-	addrs[5].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "2001:abcd:ef01::3", &addrs[6].sin6_addr);
-	addrs[6].sin6_family = AF_INET6;
-	inet_pton(AF_INET6, "2001:abcd:ef01::4", &addrs[7].sin6_addr);
-	addrs[7].sin6_family = AF_INET6;
-
 	memset(ifa, 0, sizeof(ifa));
 
-	ifa[0].ifa_next = &ifa[1];
-	ifa[0].ifa_name = "fake0";
-	ifa[0].ifa_addr = (struct sockaddr*)&addrs[0];
-	ifa[1].ifa_next = &ifa[2];
-	ifa[1].ifa_name = "fake0";
-	ifa[1].ifa_addr = (struct sockaddr*)&addrs[1];
-	ifa[2].ifa_next = &ifa[3];
-	ifa[2].ifa_name = "fake0";
-	ifa[2].ifa_addr = (struct sockaddr*)&addrs[2];
-	ifa[3].ifa_next = &ifa[4];
-	ifa[3].ifa_name = "fake0";
-	ifa[3].ifa_addr = (struct sockaddr*)&addrs[3];
-	ifa[4].ifa_next = &ifa[5];
-	ifa[4].ifa_name = "fake1";
-	ifa[4].ifa_addr = (struct sockaddr*)&addrs[4];
-	ifa[5].ifa_next = &ifa[6];
-	ifa[5].ifa_name = "fake1";
-	ifa[5].ifa_addr = (struct sockaddr*)&addrs[5];
-	ifa[6].ifa_next = &ifa[7];
-	ifa[6].ifa_name = "fake1";
-	ifa[6].ifa_addr = (struct sockaddr*)&addrs[6];
-	ifa[7].ifa_next = 0;
-	ifa[7].ifa_name = "fake1";
-	ifa[7].ifa_addr = (struct sockaddr*)&addrs[7];
+	for (int i = 0; i < countof(ifa); ++i) {
+		switch (i%3) {
+		case 2:
+			inet_pton(AF_INET6, "fe80:1234:5678::1", &addrs[i].sin6_addr);
+			addrs[i].sin6_addr.s6_addr[7] += i;
+			addrs[i].sin6_family = AF_INET6;
+			break;
 
+		case 1:
+			inet_pton(AF_INET6, "2345:1234:5678::1", &addrs[i].sin6_addr);
+			addrs[i].sin6_addr.s6_addr[7] += i+1;
+			addrs[i].sin6_family = AF_INET6;
+			break;
+
+		default:
+			inet_pton(AF_INET6, "3210:1234:5678::1", &addrs[i].sin6_addr);
+			addrs[i].sin6_addr.s6_addr[7] += i;
+			addrs[i].sin6_family = AF_INET6;
+			break;
+		}
+	}
+
+	for (int i = 0; i < countof(ifa); ++i) {
+		ifa[i].ifa_next = &ifa[i] + sizeof(ifa[0]);
+		ifa[i].ifa_name = names[(i/countof(names)) % countof(names)];
+		ifa[i].ifa_addr = (struct sockaddr*)&addrs[i];
+	}
+	ifa[countof(ifa)-1].ifa_next = 0;
+#if 0
+	for (int i = 0; i < countof(ifa); ++i) {
+		char dst[INET6_ADDRSTRLEN];
+		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa[i].ifa_addr;
+		inet_ntop(AF_INET6, &s6->sin6_addr, dst, sizeof(dst));
+		printf("%s [%s]\n", ifa[i].ifa_name, dst);
+	}
+#endif
 	return 0;
 }
 
@@ -84,6 +103,8 @@ static void iface_setup_auto(void)
 	ck_assert_ptr_eq(0, iface_auto);
 	iface_auto = readin_config("test/test1_auto.conf");
 	ck_assert_ptr_ne(0, iface_auto);
+	struct ifaddrs *ifap = 0, *ifa = 0;
+	getaddrs(&ifap);
 }
 
 static void iface_teardown_auto(void)
@@ -166,13 +187,22 @@ START_TEST (test_add_prefix_auto)
 {
 	ck_assert_ptr_ne(0, iface_auto);
 
-	struct safe_buffer sb = SAFE_BUFFER_INIT;
-	add_prefix(&sb, iface_auto->AdvPrefixList, iface_auto->state_info.cease_adv);
+	set_debuglevel(5);
+	log_open(L_STDERR, "test", 0, 0);
 
+	dlog(LOG_DEBUG, 5, "building auto-selected lists");
+	struct safe_buffer sb = SAFE_BUFFER_INIT;
+	build_ra(&sb, iface_auto);
+
+#define PRINT_SAFE_BUFFER
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
 #else
 	unsigned char expected[] = {
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x77, 0x77,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x03, 0x04, 0x40, 0xe0, 0x00, 0x01, 0x51, 0x80,
 		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -189,10 +219,53 @@ START_TEST (test_add_prefix_auto)
 		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x64, 0x64,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x99, 0x99,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 
 	ck_assert_int_eq(sizeof(expected), sb.used);
 	ck_assert_int_eq(0, memcmp(expected, sb.buffer, sb.used));
+#endif
+
+	safe_buffer_free(&sb);
+
+	sb = SAFE_BUFFER_INIT;
+	build_ra(&sb, iface_auto->next);
+
+#ifdef PRINT_SAFE_BUFFER
+	print_safe_buffer(&sb);
+#else
+	unsigned char expected2[] = {
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x77, 0x77,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xe0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x44,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x66,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x64, 0x64,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
+		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x99, 0x99,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	ck_assert_int_eq(sizeof(expected2), sb.used);
+	ck_assert_int_eq(0, memcmp(expected2, sb.buffer, sb.used));
 #endif
 
 	safe_buffer_free(&sb);
