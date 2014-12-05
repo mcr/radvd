@@ -16,6 +16,7 @@ int getaddrs(struct ifaddrs **ifap)
 {
 	static struct ifaddrs ifa[631];
 	static struct sockaddr_in6 addrs[countof(ifa)];
+	static struct sockaddr_in6 mask;
 	static char * names[] = {
 		"fake0",
 		"fake1",
@@ -42,6 +43,8 @@ int getaddrs(struct ifaddrs **ifap)
 	memset(addrs, 0, sizeof(addrs));
 	memset(ifa, 0, sizeof(ifa));
 
+	inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask.sin6_addr);
+
 	for (int i = 0; i < countof(ifa); ++i) {
 		switch (i%3) {
 		case 2:
@@ -65,17 +68,18 @@ int getaddrs(struct ifaddrs **ifap)
 	}
 
 	for (int i = 0; i < countof(ifa); ++i) {
-		ifa[i].ifa_next = &ifa[i] + sizeof(ifa[0]);
+		ifa[i].ifa_next = &ifa[i] + 1;
 		ifa[i].ifa_name = names[(i/countof(names)) % countof(names)];
 		ifa[i].ifa_addr = (struct sockaddr*)&addrs[i];
+		ifa[i].ifa_netmask = (struct sockaddr*)&mask;
 	}
 	ifa[countof(ifa)-1].ifa_next = 0;
 #if 0
-	for (int i = 0; i < countof(ifa); ++i) {
+	for (struct ifaddrs * ifa2 = ifa; ifa2; ifa2 = ifa2->ifa_next) {
 		char dst[INET6_ADDRSTRLEN];
-		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa[i].ifa_addr;
+		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa2->ifa_addr;
 		inet_ntop(AF_INET6, &s6->sin6_addr, dst, sizeof(dst));
-		printf("%s [%s]\n", ifa[i].ifa_name, dst);
+		printf("%s [%s] %p\n", ifa2->ifa_name, dst, ifa2->ifa_next);
 	}
 #endif
 	*ifap = ifa;
