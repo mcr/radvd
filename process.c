@@ -32,7 +32,7 @@ void process(int sock, struct Interface *interfaces, unsigned char *msg, int len
 	dlog(LOG_DEBUG, 4, "%s received a packet", if_name);
 
 	char addr_str[INET6_ADDRSTRLEN];
-	addrtostr(&addr->sin6_addr, addr_str, sizeof(addr_str));
+	addrtostr(AF_INET6, &addr->sin6_addr, addr_str, sizeof(addr_str));
 
 	if (!pkt_info) {
 		flog(LOG_WARNING, "%s received packet with no pkt_info from %s!", if_name, addr_str);
@@ -175,7 +175,7 @@ static void process_rs(int sock, struct Interface *iface, unsigned char *msg, in
 static void process_ra(struct Interface *iface, unsigned char *msg, int len, struct sockaddr_in6 *addr)
 {
 	char addr_str[INET6_ADDRSTRLEN];
-	addrtostr(&addr->sin6_addr, addr_str, sizeof(addr_str));
+	addrtostr(AF_INET6, &addr->sin6_addr, addr_str, sizeof(addr_str));
 
 	struct nd_router_advert *radvert = (struct nd_router_advert *)msg;
 
@@ -252,7 +252,7 @@ static void process_ra(struct Interface *iface, unsigned char *msg, int len, str
 					char prefix_str[INET6_ADDRSTRLEN];
 					if (prefix->enabled && (prefix->PrefixLen == pinfo->nd_opt_pi_prefix_len)
 					    && addr_match(&prefix->Prefix, &pinfo->nd_opt_pi_prefix, prefix->PrefixLen)) {
-						addrtostr(&prefix->Prefix, prefix_str, sizeof(prefix_str));
+						addrtostr(AF_INET6, &prefix->Prefix, prefix_str, sizeof(prefix_str));
 
 						if (!prefix->DecrementLifetimesFlag && valid != prefix->AdvValidLifetime) {
 							flog(LOG_WARNING,
@@ -301,7 +301,7 @@ static void process_ra(struct Interface *iface, unsigned char *msg, int len, str
 					rdnss = iface->AdvRDNSSList;
 					if (!check_rdnss_presence(rdnss, &rdnssinfo->nd_opt_rdnssi_addr3)) {
 						/* no match found in iface->AdvRDNSSList */
-						addrtostr(&rdnssinfo->nd_opt_rdnssi_addr3, rdnss_str, sizeof(rdnss_str));
+						addrtostr(AF_INET6, &rdnssinfo->nd_opt_rdnssi_addr3, rdnss_str, sizeof(rdnss_str));
 						flog(LOG_WARNING,
 						     "RDNSS address %s received on %s from %s is not advertised by us",
 						     rdnss_str, iface->props.name, addr_str);
@@ -311,7 +311,7 @@ static void process_ra(struct Interface *iface, unsigned char *msg, int len, str
 					rdnss = iface->AdvRDNSSList;
 					if (!check_rdnss_presence(rdnss, &rdnssinfo->nd_opt_rdnssi_addr2)) {
 						/* no match found in iface->AdvRDNSSList */
-						addrtostr(&rdnssinfo->nd_opt_rdnssi_addr2, rdnss_str, sizeof(rdnss_str));
+						addrtostr(AF_INET6, &rdnssinfo->nd_opt_rdnssi_addr2, rdnss_str, sizeof(rdnss_str));
 						flog(LOG_WARNING,
 						     "RDNSS address %s received on %s from %s is not advertised by us",
 						     rdnss_str, iface->props.name, addr_str);
@@ -321,7 +321,7 @@ static void process_ra(struct Interface *iface, unsigned char *msg, int len, str
 					rdnss = iface->AdvRDNSSList;
 					if (!check_rdnss_presence(rdnss, &rdnssinfo->nd_opt_rdnssi_addr1)) {
 						/* no match found in iface->AdvRDNSSList */
-						addrtostr(&rdnssinfo->nd_opt_rdnssi_addr1, rdnss_str, sizeof(rdnss_str));
+						addrtostr(AF_INET6, &rdnssinfo->nd_opt_rdnssi_addr1, rdnss_str, sizeof(rdnss_str));
 						flog(LOG_WARNING,
 						     "RDNSS address %s received on %s from %s is not advertised by us",
 						     rdnss_str, iface->props.name, addr_str);

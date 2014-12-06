@@ -150,7 +150,7 @@ static void update_iface_times(struct Interface * iface)
 
 					if (prefix->curr_preferredlft == 0) {
 						char pfx_str[INET6_ADDRSTRLEN];
-						addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+						addrtostr(AF_INET6, &prefix->Prefix, pfx_str, sizeof(pfx_str));
 						dlog(LOG_DEBUG, 3, "Will cease advertising %s/%u%%%s, preferred lifetime is 0", pfx_str, prefix->PrefixLen, iface->props.name);
 					}
 				}

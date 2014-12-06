@@ -74,7 +74,7 @@ START_TEST (test_addrtostr)
 			0xff, 0x00, 0x12, 0x34,
 		},
 	};
-	addrtostr(&addr, buffer, sizeof(buffer));
+	addrtostr(AF_INET6, &addr, buffer, sizeof(buffer));
 	ck_assert_str_eq(buffer, "fe80:fe80::ff00:1234");
 }
 END_TEST
@@ -90,7 +90,7 @@ START_TEST (test_addrtostr_overflow)
 			0xff, 0x00, 0x12, 0x34,
 		},
 	};
-	addrtostr(&addr, buffer, sizeof(buffer));
+	addrtostr(AF_INET6, &addr, buffer, sizeof(buffer));
 	ck_assert_str_eq(buffer, "[invalid address]");
 }
 END_TEST

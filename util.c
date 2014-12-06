@@ -93,11 +93,11 @@ double rand_between(double lower, double upper)
 }
 
 /* This assumes that str is not null and str_size > 0 */
-void addrtostr(struct in6_addr const *addr, char *str, size_t str_size)
+void addrtostr(int type, void const *addr, char *str, size_t str_size)
 {
 	const char *res;
 
-	res = inet_ntop(AF_INET6, (void const *)addr, str, str_size);
+	res = inet_ntop(type, addr, str, str_size);
 
 	if (res == NULL) {
 		flog(LOG_ERR, "addrtostr: inet_ntop: %s", strerror(errno));

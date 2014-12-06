@@ -90,7 +90,7 @@ int setup_linklocal_addr(struct Interface *iface)
 			freeifaddrs(addresses);
 
 			char addr_str[INET6_ADDRSTRLEN];
-			addrtostr(&iface->props.if_addr, addr_str, sizeof(addr_str));
+			addrtostr(AF_INET6, &iface->props.if_addr, addr_str, sizeof(addr_str));
 			dlog(LOG_DEBUG, 4, "%s linklocal address: %s", iface->props.name, addr_str);
 
 			return 0;
