@@ -12,12 +12,17 @@
 # define countof(x) (sizeof(x)/sizeof(x[0]))
 #endif
 
+typedef union {
+	struct sockaddr_in6 in6;
+	struct sockaddr_in in;
+} sockaddr;
+
 int getaddrs(struct ifaddrs **ifap)
 {
-	static struct ifaddrs ifa[631];
-	static struct sockaddr_in6 addrs[countof(ifa)];
+	static struct ifaddrs ifa[8*4*1024];
+	static sockaddr addrs[countof(ifa)];
 	static struct sockaddr_in6 mask;
-	static char * names[128] = {0};
+	static char * names[4*1024] = {0};
 
 	memset(addrs, 0, sizeof(addrs));
 	memset(ifa, 0, sizeof(ifa));
@@ -33,40 +38,87 @@ int getaddrs(struct ifaddrs **ifap)
 	}
 
 	for (int i = 0; i < countof(ifa); ++i) {
-		switch (i%3) {
+		int j = i / 8;
+		switch (i%8) {
+		case 7:
+			addrs[i].in.sin_addr.s_addr = (j & 0xffffff);
+			addrs[i].in.sin_addr.s_addr |= 0x0c000000;
+			addrs[i].in.sin_addr.s_addr = htonl(addrs[i].in.sin_addr.s_addr);
+			addrs[i].in.sin_family = AF_INET;
+			break;
+
+		case 6:
+			addrs[i].in.sin_addr.s_addr = (j & 0xffffff);
+			addrs[i].in.sin_addr.s_addr |= 0x0b000000;
+			addrs[i].in.sin_addr.s_addr = htonl(addrs[i].in.sin_addr.s_addr);
+			addrs[i].in.sin_family = AF_INET;
+			break;
+
+		case 5:
+			addrs[i].in.sin_addr.s_addr = (j & 0xffffff);
+			addrs[i].in.sin_addr.s_addr |= 0x0a000000;
+			addrs[i].in.sin_addr.s_addr = htonl(addrs[i].in.sin_addr.s_addr);
+			addrs[i].in.sin_family = AF_INET;
+			break;
+		case 4:
+			inet_pton(AF_INET6, "fe80:f00d::1", &addrs[i].in6.sin6_addr);
+			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
+			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
+			addrs[i].in6.sin6_family = AF_INET6;
+			break;
+
+		case 3:
+			inet_pton(AF_INET6, "fe80:cafe::1", &addrs[i].in6.sin6_addr);
+			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
+			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
+			addrs[i].in6.sin6_family = AF_INET6;
+			break;
+
 		case 2:
-			inet_pton(AF_INET6, "fe80:1234:5678::1", &addrs[i].sin6_addr);
-			addrs[i].sin6_addr.s6_addr[7] += i;
-			addrs[i].sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "2001:feed::1", &addrs[i].in6.sin6_addr);
+			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
+			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
+			addrs[i].in6.sin6_family = AF_INET6;
 			break;
 
 		case 1:
-			inet_pton(AF_INET6, "2001:1234:5678::1", &addrs[i].sin6_addr);
-			addrs[i].sin6_addr.s6_addr[7] += i+1;
-			addrs[i].sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "2001:cafe::1", &addrs[i].in6.sin6_addr);
+			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
+			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
+			addrs[i].in6.sin6_family = AF_INET6;
 			break;
 
 		default:
-			inet_pton(AF_INET6, "2010:1234:5678::1", &addrs[i].sin6_addr);
-			addrs[i].sin6_addr.s6_addr[7] += i;
-			addrs[i].sin6_family = AF_INET6;
+			inet_pton(AF_INET6, "2001:f00d::1", &addrs[i].in6.sin6_addr);
+			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
+			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
+			addrs[i].in6.sin6_family = AF_INET6;
 			break;
 		}
 	}
 
 	for (int i = 0; i < countof(ifa); ++i) {
-		ifa[i].ifa_next = &ifa[i] + 1;
-		ifa[i].ifa_name = names[(i/countof(names)) % countof(names)];
+		int name_index = countof(names) * (i / (double)countof(ifa));
+		ifa[i].ifa_name = names[name_index % countof(names)];
 		ifa[i].ifa_addr = (struct sockaddr*)&addrs[i];
 		ifa[i].ifa_netmask = (struct sockaddr*)&mask;
+		ifa[i].ifa_next = &ifa[i] + 1;
 	}
 	ifa[countof(ifa)-1].ifa_next = 0;
 #if 0
 	for (struct ifaddrs * ifa2 = ifa; ifa2; ifa2 = ifa2->ifa_next) {
 		char dst[INET6_ADDRSTRLEN];
-		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa2->ifa_addr;
-		inet_ntop(AF_INET6, &s6->sin6_addr, dst, sizeof(dst));
-		printf("%s [%s] %p\n", ifa2->ifa_name, dst, ifa2->ifa_next);
+		if (ifa2->ifa_addr->sa_family == AF_INET6) {
+			char mask[INET6_ADDRSTRLEN];
+			struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa2->ifa_addr;
+			inet_ntop(AF_INET6, &s6->sin6_addr, dst, sizeof(dst));
+			printf("%s 6 %s 64\n", ifa2->ifa_name, dst);
+		}
+		else if (ifa2->ifa_addr->sa_family == AF_INET) {
+			struct sockaddr_in *s = (struct sockaddr_in *)ifa2->ifa_addr;
+			inet_ntop(AF_INET, &s->sin_addr, dst, sizeof(dst));
+			printf("%s 4 %s\n", ifa2->ifa_name, dst);
+		}
 	}
 #endif
 	*ifap = ifa;
@@ -87,24 +139,7 @@ START_TEST (test_decrement_lifetime)
 }
 END_TEST
 
-static struct Interface * iface_auto = 0;
 static struct Interface * iface = 0;
-
-static void iface_setup_auto(void)
-{
-	ck_assert_ptr_eq(0, iface_auto);
-	iface_auto = readin_config("test/test1_auto.conf");
-	ck_assert_ptr_ne(0, iface_auto);
-	struct ifaddrs *ifap = 0, *ifa = 0;
-	getaddrs(&ifap);
-}
-
-static void iface_teardown_auto(void)
-{
-	ck_assert_ptr_ne(0, iface_auto);
-	free_ifaces(iface_auto);
-	iface_auto = 0;
-}
 
 static void iface_setup(void)
 {
@@ -175,14 +210,15 @@ START_TEST (test_add_prefix)
 }
 END_TEST
 
-START_TEST (test_add_prefix_auto)
+START_TEST (test_add_prefix_auto_zero)
 {
+	static struct Interface * iface_auto = 0;
+	iface_auto = readin_config("test/test_auto_zero.conf");
 	ck_assert_ptr_ne(0, iface_auto);
 
 	set_debuglevel(5);
 	log_open(L_STDERR, "test", 0, 0);
 
-	dlog(LOG_DEBUG, 5, "building auto-selected lists");
 	struct safe_buffer sb = SAFE_BUFFER_INIT;
 	build_ra(&sb, iface_auto);
 
@@ -190,31 +226,94 @@ START_TEST (test_add_prefix_auto)
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
 #else
-	unsigned char expected[] = {
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x77, 0x77,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xe0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x44,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x66,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x64, 0x64,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x99, 0x99,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	unsigned char expected2[] = {
+	};
+
+	ck_assert_int_eq(sizeof(expected), sb.used);
+	ck_assert_int_eq(0, memcmp(expected, sb.buffer, sb.used));
+#endif
+
+	safe_buffer_free(&sb);
+	free_ifaces(iface_auto);
+}
+END_TEST
+
+
+START_TEST (test_add_prefix_auto_base6)
+{
+	static struct Interface * iface_auto = 0;
+	iface_auto = readin_config("test/test_auto_base6.conf");
+	ck_assert_ptr_ne(0, iface_auto);
+
+	set_debuglevel(5);
+	log_open(L_STDERR, "test", 0, 0);
+
+	struct safe_buffer sb = SAFE_BUFFER_INIT;
+	build_ra(&sb, iface_auto);
+
+#define PRINT_SAFE_BUFFER
+#ifdef PRINT_SAFE_BUFFER
+	print_safe_buffer(&sb);
+#else
+	unsigned char expected2[] = {
+	};
+
+	ck_assert_int_eq(sizeof(expected), sb.used);
+	ck_assert_int_eq(0, memcmp(expected, sb.buffer, sb.used));
+#endif
+
+	safe_buffer_free(&sb);
+	free_ifaces(iface_auto);
+}
+END_TEST
+
+
+START_TEST (test_add_prefix_auto_base6to4)
+{
+	static struct Interface * iface_auto = 0;
+	iface_auto = readin_config("test/test_auto_base6to4.conf");
+	ck_assert_ptr_ne(0, iface_auto);
+
+	set_debuglevel(5);
+	log_open(L_STDERR, "test", 0, 0);
+
+	struct safe_buffer sb = SAFE_BUFFER_INIT;
+	build_ra(&sb, iface_auto);
+
+#define PRINT_SAFE_BUFFER
+#ifdef PRINT_SAFE_BUFFER
+	print_safe_buffer(&sb);
+#else
+	unsigned char expected2[] = {
+	};
+
+	ck_assert_int_eq(sizeof(expected), sb.used);
+	ck_assert_int_eq(0, memcmp(expected, sb.buffer, sb.used));
+#endif
+
+	safe_buffer_free(&sb);
+	free_ifaces(iface_auto);
+}
+END_TEST
+
+
+START_TEST (test_add_prefix_auto)
+{
+	static struct Interface * iface_auto = 0;
+	iface_auto = readin_config("test/test_auto.conf");
+	ck_assert_ptr_ne(0, iface_auto);
+
+	set_debuglevel(5);
+	log_open(L_STDERR, "test", 0, 0);
+
+	struct safe_buffer sb = SAFE_BUFFER_INIT;
+	build_ra(&sb, iface_auto);
+
+#define PRINT_SAFE_BUFFER
+#ifdef PRINT_SAFE_BUFFER
+	print_safe_buffer(&sb);
+#else
+	unsigned char expected2[] = {
 	};
 
 	ck_assert_int_eq(sizeof(expected), sb.used);
@@ -229,38 +328,12 @@ START_TEST (test_add_prefix_auto)
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
 #else
-	unsigned char expected2[] = {
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x77, 0x77,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xe0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x44,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x66,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x64, 0x64,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x03, 0x04, 0x40, 0xc0, 0x00, 0x01, 0x51, 0x80,
-		0x00, 0x00, 0x38, 0x40, 0x00, 0x00, 0x00, 0x00,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x99, 0x99,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	};
-
 	ck_assert_int_eq(sizeof(expected2), sb.used);
 	ck_assert_int_eq(0, memcmp(expected2, sb.buffer, sb.used));
 #endif
 
 	safe_buffer_free(&sb);
+	free_ifaces(iface_auto);
 }
 END_TEST
 
@@ -530,7 +603,9 @@ Suite * send_suite(void)
 	tcase_add_test(tc_update, test_decrement_lifetime);
 
 	TCase * tc_auto = tcase_create("auto");
-	tcase_add_unchecked_fixture(tc_auto, iface_setup_auto, iface_teardown_auto);
+	tcase_add_test(tc_auto, test_add_prefix_auto_zero);
+	tcase_add_test(tc_auto, test_add_prefix_auto_base6);
+	tcase_add_test(tc_auto, test_add_prefix_auto_base6to4);
 	tcase_add_test(tc_auto, test_add_prefix_auto);
 
 	TCase * tc_build = tcase_create("build");
