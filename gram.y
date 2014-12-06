@@ -369,6 +369,9 @@ prefixdef	: prefixhead optional_prefixplist ';'
 				ABORT;
 			}
 
+			char pfx_str[INET6_ADDRSTRLEN];
+			addrtostr(AF_INET6, &prefix->Prefix, pfx_str, sizeof(pfx_str));
+
 			struct in6_addr zeroaddr;
 			memset(&zeroaddr, 0, sizeof(zeroaddr));
 			if (0 == memcmp(&prefix->Prefix, &zeroaddr, sizeof(struct in6_addr)) && prefix->PrefixLen == 64) {
@@ -376,8 +379,12 @@ prefixdef	: prefixhead optional_prefixplist ';'
 				flog(LOG_ERR, "Autoselecting prefix not supported in %s, line %d", filename, num_lines);
 				ABORT;
 #endif
-				dlog(LOG_DEBUG, 4, "%s will use prefixes found in getifaddrs", iface->props.name);
-				prefix->AdvRouterAddr = 1;
+				dlog(LOG_DEBUG, 4, "%s prefix %s/%d will generate auto-prefixes from its own IPv6 addresses",
+					iface->props.name, pfx_str, prefix->PrefixLen);
+				if (!prefix->AdvRouterAddr) {
+					dlog(LOG_DEBUG, 4, "%s forcing auto-prefix AdvRouterAddr on", iface->props.name);
+					prefix->AdvRouterAddr = 1;
+				}
 			}
 
 			if (prefix->if6[0]) {
@@ -390,15 +397,29 @@ prefixdef	: prefixhead optional_prefixplist ';'
 					flog(LOG_ERR, "only /64 is allowed with Base6Interface.  %s:%d", filename, num_lines);
 					ABORT;
 				}
-				dlog(LOG_DEBUG, 4, "%s will use prefixes on interface %s", iface->props.name, prefix->if6);
+				dlog(LOG_DEBUG, 4, "%s prefix %s/%d will generate auto-prefixes using IPv6 addresses from %s",
+					iface->props.name, pfx_str, prefix->PrefixLen, prefix->if6);
+				if (!prefix->AdvRouterAddr) {
+					dlog(LOG_DEBUG, 4, "%s forcing auto-prefix AdvRouterAddr on", iface->props.name);
+					prefix->AdvRouterAddr = 1;
+				}
 			}
 
 			if (prefix->if6to4[0]) {
+#ifndef HAVE_IFADDRS_H
+				flog(LOG_ERR, "Autoselecting prefix not supported in %s, line %d", filename, num_lines);
+				ABORT;
+#endif
 				if (prefix->PrefixLen != 64) {
 					flog(LOG_ERR, "only /64 is allowed with Base6to4Interface.  %s:%d", filename, num_lines);
 					ABORT;
 				}
-				dlog(LOG_DEBUG, 4, "%s will use IPv4 addresses on interface %s for 6to4 prefixes", iface->props.name, prefix->if6to4);
+				dlog(LOG_DEBUG, 4, "%s prefix %s/%d will generate 6to4 prefixes using IPv4 addresses from %s",
+					iface->props.name, pfx_str, prefix->PrefixLen, prefix->if6to4);
+				if (!prefix->AdvRouterAddr) {
+					dlog(LOG_DEBUG, 4, "%s forcing auto-prefix AdvRouterAddr on", iface->props.name);
+					prefix->AdvRouterAddr = 1;
+				}
 			}
 
 			$$ = prefix;
