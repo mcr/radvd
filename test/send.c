@@ -1,5 +1,7 @@
 
+#include <assert.h>
 #include <check.h>
+
 #include "test/print_safe_buffer.h"
 
 /*
@@ -19,94 +21,79 @@ typedef union {
 
 int getaddrs(struct ifaddrs **ifap)
 {
-	static struct ifaddrs ifa[8*4*1024];
-	static sockaddr addrs[countof(ifa)];
-	static struct sockaddr_in6 mask;
-	static char * names[4*1024] = {0};
+	struct ifaddrs * retval = 0;
 
-	memset(addrs, 0, sizeof(addrs));
-	memset(ifa, 0, sizeof(ifa));
+	FILE * in = fopen("test/ifaddrs4096.txt", "r");
+	if (in) {
+		do {
+			char name[100];
+			int type;
+			char addr_str[INET6_ADDRSTRLEN];
+			int int_mask;
 
-	inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask.sin6_addr);
+			char line[1024];
+			char * s = fgets(line, sizeof(line), in);
+			if (s) {
+				int count = sscanf(s, " %s %d %s %d", name, &type, addr_str, &int_mask);
+				if (count >= 3) {
+					struct ifaddrs * ifa = malloc(sizeof(struct ifaddrs));
 
-	if (0 == names[0]) {
-		for (int i = 0; i < countof(names); ++i) {
-			char buffer[IFNAMSIZ];
-			snprintf(buffer, sizeof(buffer), "fake%d", i);
-			names[i] = strdup(buffer);
-		}
+					memset(ifa, 0, sizeof(struct ifaddrs));
+
+					ifa->ifa_name = strdup(name);
+					switch (type) {
+					case 4: {
+						struct sockaddr_in * in;
+
+						in = malloc(sizeof(struct sockaddr_in));
+
+						memset(in, 0, sizeof(struct sockaddr_in));
+
+						in->sin_family = AF_INET;
+
+						assert(inet_pton(AF_INET, addr_str, &in->sin_addr));
+
+						ifa->ifa_addr = (struct sockaddr *)in;
+					}break;
+
+					case 6: {
+						struct sockaddr_in6 * in6;
+						struct sockaddr_in6 * mask;
+
+						in6 = malloc(sizeof(struct sockaddr_in6));
+						mask = malloc(sizeof(struct sockaddr_in6));
+
+						memset(in6, 0, sizeof(struct sockaddr_in6));
+						memset(mask, 0, sizeof(struct sockaddr_in6));
+
+						in6->sin6_family = AF_INET6;
+						mask->sin6_family = AF_INET6;
+
+						assert(inet_pton(AF_INET6, addr_str, &in6->sin6_addr));
+						if (int_mask == 64) {
+							assert(inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask->sin6_addr));
+						} else {
+							assert(0);
+						}
+
+						ifa->ifa_addr = (struct sockaddr *)in6;
+						ifa->ifa_netmask = (struct sockaddr *)mask;
+					}break;
+
+					default:
+						abort();
+					}
+
+					ifa->ifa_next = retval;
+					retval = ifa;
+				}
+			}
+		} while (!feof(in));
+		fclose(in);
 	}
 
-	for (int i = 0; i < countof(ifa); ++i) {
-		int j = i / 8;
-		switch (i%8) {
-		case 7:
-			addrs[i].in.sin_addr.s_addr = (j & 0xffffff);
-			addrs[i].in.sin_addr.s_addr |= 0x0c000000;
-			addrs[i].in.sin_addr.s_addr = htonl(addrs[i].in.sin_addr.s_addr);
-			addrs[i].in.sin_family = AF_INET;
-			break;
-
-		case 6:
-			addrs[i].in.sin_addr.s_addr = (j & 0xffffff);
-			addrs[i].in.sin_addr.s_addr |= 0x0b000000;
-			addrs[i].in.sin_addr.s_addr = htonl(addrs[i].in.sin_addr.s_addr);
-			addrs[i].in.sin_family = AF_INET;
-			break;
-
-		case 5:
-			addrs[i].in.sin_addr.s_addr = (j & 0xffffff);
-			addrs[i].in.sin_addr.s_addr |= 0x0a000000;
-			addrs[i].in.sin_addr.s_addr = htonl(addrs[i].in.sin_addr.s_addr);
-			addrs[i].in.sin_family = AF_INET;
-			break;
-		case 4:
-			inet_pton(AF_INET6, "fe80:f00d::1", &addrs[i].in6.sin6_addr);
-			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
-			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
-			addrs[i].in6.sin6_family = AF_INET6;
-			break;
-
-		case 3:
-			inet_pton(AF_INET6, "fe80:cafe::1", &addrs[i].in6.sin6_addr);
-			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
-			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
-			addrs[i].in6.sin6_family = AF_INET6;
-			break;
-
-		case 2:
-			inet_pton(AF_INET6, "2001:feed::1", &addrs[i].in6.sin6_addr);
-			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
-			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
-			addrs[i].in6.sin6_family = AF_INET6;
-			break;
-
-		case 1:
-			inet_pton(AF_INET6, "2001:cafe::1", &addrs[i].in6.sin6_addr);
-			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
-			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
-			addrs[i].in6.sin6_family = AF_INET6;
-			break;
-
-		default:
-			inet_pton(AF_INET6, "2001:f00d::1", &addrs[i].in6.sin6_addr);
-			addrs[i].in6.sin6_addr.s6_addr[7] += j & 0xff;
-			addrs[i].in6.sin6_addr.s6_addr[6] += (j>>8) & 0xff;
-			addrs[i].in6.sin6_family = AF_INET6;
-			break;
-		}
-	}
-
-	for (int i = 0; i < countof(ifa); ++i) {
-		int name_index = countof(names) * (i / (double)countof(ifa));
-		ifa[i].ifa_name = names[name_index % countof(names)];
-		ifa[i].ifa_addr = (struct sockaddr*)&addrs[i];
-		ifa[i].ifa_netmask = (struct sockaddr*)&mask;
-		ifa[i].ifa_next = &ifa[i] + 1;
-	}
-	ifa[countof(ifa)-1].ifa_next = 0;
 #if 0
-	for (struct ifaddrs * ifa2 = ifa; ifa2; ifa2 = ifa2->ifa_next) {
+	for (struct ifaddrs * ifa2 = retval; ifa2; ifa2 = ifa2->ifa_next) {
 		char dst[INET6_ADDRSTRLEN];
 		if (ifa2->ifa_addr->sa_family == AF_INET6) {
 			char mask[INET6_ADDRSTRLEN];
@@ -121,12 +108,25 @@ int getaddrs(struct ifaddrs **ifap)
 		}
 	}
 #endif
-	*ifap = ifa;
+
+	*ifap = retval;
+
 	return 0;
 }
 
 void freeaddrs(struct ifaddrs *ifa)
 {
+	struct ifaddrs * ifa2 = ifa;
+	while (ifa2) {
+		struct ifaddrs * next = ifa2->ifa_next;
+		if (ifa2->ifa_addr->sa_family == AF_INET6) {
+			free(ifa2->ifa_netmask);
+		}
+		free(ifa2->ifa_addr);
+		free(ifa2->ifa_name);
+		free(ifa2);
+		ifa2 = next;
+	}
 }
 
 START_TEST (test_decrement_lifetime)
