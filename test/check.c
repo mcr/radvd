@@ -138,6 +138,13 @@ int main(int argc, char * argv[])
 	int number_failed = srunner_ntests_failed(sr);
 	srunner_free(sr);
 
+
+	if (options.suite)
+		free(options.suite);
+
+	if (options.test)
+		free(options.test);
+
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
