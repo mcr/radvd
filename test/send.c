@@ -19,6 +19,21 @@ typedef union {
 	struct sockaddr_in in;
 } sockaddr;
 
+
+static struct ifaddrs * reverse_list(struct ifaddrs * list)
+{
+	struct ifaddrs * prev = 0;
+	struct ifaddrs * cur = list;
+
+	while (cur) {
+		struct ifaddrs * next = cur->ifa_next;
+		cur->ifa_next = prev;
+		prev = cur;
+		cur = next;
+	}
+	return prev;
+}
+
 int getaddrs(struct ifaddrs **ifap)
 {
 	struct ifaddrs * retval = 0;
@@ -92,6 +107,7 @@ int getaddrs(struct ifaddrs **ifap)
 		fclose(in);
 	}
 
+	retval = reverse_list(retval);
 #if 0
 	for (struct ifaddrs * ifa2 = retval; ifa2; ifa2 = ifa2->ifa_next) {
 		char dst[INET6_ADDRSTRLEN];
