@@ -14,12 +14,6 @@
 # define countof(x) (sizeof(x)/sizeof(x[0]))
 #endif
 
-typedef union {
-	struct sockaddr_in6 in6;
-	struct sockaddr_in in;
-} sockaddr;
-
-
 static struct ifaddrs * reverse_list(struct ifaddrs * list)
 {
 	struct ifaddrs * prev = 0;
