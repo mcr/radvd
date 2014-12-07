@@ -165,7 +165,7 @@ int set_interface_retranstimer(const char *iface, uint32_t rettimer)
 
 int check_ip6_forwarding(void)
 {
-	int value;
+	int value = -1;
 	FILE *fp = NULL;
 
 	fp = fopen(PROC_SYS_IP6_FORWARDING, "r");
@@ -180,7 +180,6 @@ int check_ip6_forwarding(void)
 		flog(LOG_DEBUG,
 		     "Correct IPv6 forwarding procfs entry not found, " "perhaps the procfs is disabled, "
 		     "or the kernel interface has changed?");
-		value = -1;
 	}
 
 #ifdef HAVE_SYSCTL
@@ -189,7 +188,6 @@ int check_ip6_forwarding(void)
 	if (!fp && sysctl(forw_sysctl, sizeof(forw_sysctl) / sizeof(forw_sysctl[0]), &value, &size, NULL, 0) < 0) {
 		flog(LOG_DEBUG,
 		     "Correct IPv6 forwarding sysctl branch not found, " "perhaps the kernel interface has changed?");
-		return 0;	/* this is of advisory value only */
 	}
 #endif
 
@@ -200,10 +198,10 @@ int check_ip6_forwarding(void)
 	 *
 	 * Which is sometimes used on routers performing RS on their WAN (ppp, etc.) links
 	 */
-	static int warned = 0;
-	if (!warned && value != 1 && value != 2) {
-		warned = 1;
-		flog(LOG_DEBUG, "IPv6 forwarding setting is: %u, should be 1 or 2", value);
+	static int level = 1;
+	if (value != 1 && value != 2) {
+		dlog(LOG_DEBUG, level, "IPv6 forwarding setting is: %u, should be 1 or 2", value);
+		level = 5;
 		return -1;
 	}
 
