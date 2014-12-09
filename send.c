@@ -19,8 +19,9 @@
 
 static int ensure_iface_setup(int sock, struct Interface *iface);
 static int really_send(int sock, struct in6_addr const *dest, struct properties const *props, struct safe_buffer const *sb);
-static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest);
+static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest, struct AdvPrefix * prefix_list);
 static size_t serialize_domain_names(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl);
+static struct AdvPrefix * build_prefix_list(struct Interface const * iface);
 static struct AdvPrefix * new_prefix(void);
 static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr const *mask);
 static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo);
@@ -34,7 +35,7 @@ static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const *
 static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv);
 static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv);
 static void add_sllao(struct safe_buffer * sb, struct sllao const *sllao);
-static void build_ra(struct safe_buffer * sb, struct Interface const * iface);
+static void build_ra(struct safe_buffer * sb, struct Interface const * iface, struct AdvPrefix * prefix_list);
 static void decrement_lifetime(const time_t secs, uint32_t * lifetime);
 static void update_iface_times(struct Interface * iface);
 
@@ -65,13 +66,17 @@ int send_ra_forall(int sock, struct Interface *iface, struct in6_addr *dest)
 	if (iface->state_info.racount < MAX_INITIAL_RTR_ADVERTISEMENTS)
 		iface->state_info.racount++;
 
+	struct AdvPrefix * prefix_list = build_prefix_list(iface);
+
 	/* If no list of clients was specified for this interface, we broadcast */
 	if (iface->ClientList == NULL) {
 		if (dest == NULL && iface->UnicastOnly) {
 			dlog(LOG_DEBUG, 5, "no client list, no destination, unicast only...doing nothing");
 			return 0;
 		}
-		return send_ra(sock, iface, dest);
+		int rc = send_ra(sock, iface, dest, prefix_list);
+		free_prefix_list(prefix_list);
+		return rc;
 	}
 
 	/* If clients are configured, send the advertisement to all of them via unicast */
@@ -80,12 +85,16 @@ int send_ra_forall(int sock, struct Interface *iface, struct in6_addr *dest)
 		if (dest != NULL && memcmp(dest, &current->Address, sizeof(struct in6_addr)) != 0)
 			continue;
 
-		send_ra(sock, iface, &(current->Address));
+		send_ra(sock, iface, dest, prefix_list);
 
 		/* If we should only send the RA to a specific address, we are done */
-		if (dest != NULL)
+		if (dest != NULL) {
+			free_prefix_list(prefix_list);
 			return 0;
+		}
 	}
+
+	free_prefix_list(prefix_list);
 
 	if (dest == NULL)
 		return 0;
@@ -834,14 +843,12 @@ static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo)
 }
 
 
-static void build_ra(struct safe_buffer * sb, struct Interface const * iface)
+static void build_ra(struct safe_buffer * sb, struct Interface const * iface, struct AdvPrefix * prefix_list)
 {
 	add_ra_header(sb, &iface->ra_header_info, iface->state_info.cease_adv);
 
-	if (iface->AdvPrefixList) {
-		struct AdvPrefix * prefix_list = build_prefix_list(iface);
+	if (prefix_list) {
 		add_prefix(sb, prefix_list, iface->state_info.cease_adv);
-		free_prefix_list(prefix_list);
 	}
 
 	if (iface->AdvRouteList) {
@@ -883,7 +890,7 @@ static void build_ra(struct safe_buffer * sb, struct Interface const * iface)
 	}
 }
 
-static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest)
+static int send_ra(int sock, struct Interface *iface, struct in6_addr const *dest, struct AdvPrefix * prefix_list)
 {
 	if (!iface->AdvSendAdvert) {
 		dlog(LOG_DEBUG, 2, "AdvSendAdvert is off for %s", iface->props.name);
@@ -904,7 +911,7 @@ static int send_ra(int sock, struct Interface *iface, struct in6_addr const *des
 
 	struct safe_buffer safe_buffer = SAFE_BUFFER_INIT;
 
-	build_ra(&safe_buffer, iface);
+	build_ra(&safe_buffer, iface, prefix_list);
 
 	int err = really_send(sock, dest, &iface->props, &safe_buffer);
 
