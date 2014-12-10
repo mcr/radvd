@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <check.h>
 
+#include "test/getaddrs.h"
 #include "test/print_safe_buffer.h"
 
 /*
@@ -9,135 +10,6 @@
  *
  * http://entrenchant.blogspot.com/2010/08/unit-testing-in-c.html
  */
-
-#ifndef countof
-# define countof(x) (sizeof(x)/sizeof(x[0]))
-#endif
-
-static struct ifaddrs * reverse_list(struct ifaddrs * list)
-{
-	struct ifaddrs * prev = 0;
-	struct ifaddrs * cur = list;
-
-	while (cur) {
-		struct ifaddrs * next = cur->ifa_next;
-		cur->ifa_next = prev;
-		prev = cur;
-		cur = next;
-	}
-	return prev;
-}
-
-int getaddrs(struct ifaddrs **ifap)
-{
-	struct ifaddrs * retval = 0;
-
-	FILE * in = fopen("test/ifaddrs4096.txt", "r");
-	if (in) {
-		do {
-			char name[100];
-			int type;
-			char addr_str[INET6_ADDRSTRLEN];
-			int int_mask;
-
-			char line[1024];
-			char * s = fgets(line, sizeof(line), in);
-			if (s) {
-				int count = sscanf(s, " %s %d %s %d", name, &type, addr_str, &int_mask);
-				if (count >= 3) {
-					struct ifaddrs * ifa = malloc(sizeof(struct ifaddrs));
-
-					memset(ifa, 0, sizeof(struct ifaddrs));
-
-					ifa->ifa_name = strdup(name);
-					switch (type) {
-					case 4: {
-						struct sockaddr_in * in;
-
-						in = malloc(sizeof(struct sockaddr_in));
-
-						memset(in, 0, sizeof(struct sockaddr_in));
-
-						in->sin_family = AF_INET;
-
-						assert(inet_pton(AF_INET, addr_str, &in->sin_addr));
-
-						ifa->ifa_addr = (struct sockaddr *)in;
-					}break;
-
-					case 6: {
-						struct sockaddr_in6 * in6;
-						struct sockaddr_in6 * mask;
-
-						in6 = malloc(sizeof(struct sockaddr_in6));
-						mask = malloc(sizeof(struct sockaddr_in6));
-
-						memset(in6, 0, sizeof(struct sockaddr_in6));
-						memset(mask, 0, sizeof(struct sockaddr_in6));
-
-						in6->sin6_family = AF_INET6;
-						mask->sin6_family = AF_INET6;
-
-						assert(inet_pton(AF_INET6, addr_str, &in6->sin6_addr));
-						if (int_mask == 64) {
-							assert(inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask->sin6_addr));
-						} else {
-							assert(0);
-						}
-
-						ifa->ifa_addr = (struct sockaddr *)in6;
-						ifa->ifa_netmask = (struct sockaddr *)mask;
-					}break;
-
-					default:
-						abort();
-					}
-
-					ifa->ifa_next = retval;
-					retval = ifa;
-				}
-			}
-		} while (!feof(in));
-		fclose(in);
-	}
-
-	retval = reverse_list(retval);
-#if 0
-	for (struct ifaddrs * ifa2 = retval; ifa2; ifa2 = ifa2->ifa_next) {
-		char dst[INET6_ADDRSTRLEN];
-		if (ifa2->ifa_addr->sa_family == AF_INET6) {
-			char mask[INET6_ADDRSTRLEN];
-			struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa2->ifa_addr;
-			inet_ntop(AF_INET6, &s6->sin6_addr, dst, sizeof(dst));
-			printf("%s 6 %s 64\n", ifa2->ifa_name, dst);
-		}
-		else if (ifa2->ifa_addr->sa_family == AF_INET) {
-			struct sockaddr_in *s = (struct sockaddr_in *)ifa2->ifa_addr;
-			inet_ntop(AF_INET, &s->sin_addr, dst, sizeof(dst));
-			printf("%s 4 %s\n", ifa2->ifa_name, dst);
-		}
-	}
-#endif
-
-	*ifap = retval;
-
-	return 0;
-}
-
-void freeaddrs(struct ifaddrs *ifa)
-{
-	struct ifaddrs * ifa2 = ifa;
-	while (ifa2) {
-		struct ifaddrs * next = ifa2->ifa_next;
-		if (ifa2->ifa_addr->sa_family == AF_INET6) {
-			free(ifa2->ifa_netmask);
-		}
-		free(ifa2->ifa_addr);
-		free(ifa2->ifa_name);
-		free(ifa2);
-		ifa2 = next;
-	}
-}
 
 START_TEST (test_decrement_lifetime)
 {
@@ -148,6 +20,17 @@ START_TEST (test_decrement_lifetime)
 	ck_assert_int_eq(lifetime, 0);
 }
 END_TEST
+
+static void auto_setup(void)
+{
+	setaddrs("test/ifaddrs4096.txt");
+}
+
+static void auto_teardown(void)
+{
+	setaddrs(0);
+}
+
 
 static struct Interface * iface = 0;
 
@@ -230,7 +113,9 @@ START_TEST (test_add_prefix_auto_zero)
 	log_open(L_STDERR, "test", 0, 0);
 
 	struct safe_buffer sb = SAFE_BUFFER_INIT;
-	build_ra(&sb, iface_auto);
+	struct AdvPrefix * prefix_list = build_prefix_list(iface_auto);
+	build_ra(&sb, iface_auto, prefix_list);
+	free_prefix_list(prefix_list);
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
 #else
@@ -272,7 +157,9 @@ START_TEST (test_add_prefix_auto_base6)
 	log_open(L_STDERR, "test", 0, 0);
 
 	struct safe_buffer sb = SAFE_BUFFER_INIT;
-	build_ra(&sb, iface_auto);
+	struct AdvPrefix * prefix_list = build_prefix_list(iface_auto);
+	build_ra(&sb, iface_auto, prefix_list);
+	free_prefix_list(prefix_list);
 
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
@@ -327,7 +214,9 @@ START_TEST (test_add_prefix_auto_base6to4)
 	log_open(L_STDERR, "test", 0, 0);
 
 	struct safe_buffer sb = SAFE_BUFFER_INIT;
-	build_ra(&sb, iface_auto);
+	struct AdvPrefix * prefix_list = build_prefix_list(iface_auto);
+	build_ra(&sb, iface_auto, prefix_list);
+	free_prefix_list(prefix_list);
 
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
@@ -382,7 +271,9 @@ START_TEST (test_add_prefix_auto)
 	log_open(L_STDERR, "test", 0, 0);
 
 	struct safe_buffer sb = SAFE_BUFFER_INIT;
-	build_ra(&sb, iface_auto);
+	struct AdvPrefix * prefix_list = build_prefix_list(iface_auto);
+	build_ra(&sb, iface_auto, prefix_list);
+	free_prefix_list(prefix_list);
 
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
@@ -460,7 +351,9 @@ START_TEST (test_add_prefix_auto)
 	safe_buffer_free(&sb);
 
 	sb = SAFE_BUFFER_INIT;
-	build_ra(&sb, iface_auto->next);
+	prefix_list = build_prefix_list(iface_auto->next);
+	build_ra(&sb, iface_auto->next, prefix_list);
+	free_prefix_list(prefix_list);
 
 #ifdef PRINT_SAFE_BUFFER
 	print_safe_buffer(&sb);
@@ -817,6 +710,7 @@ Suite * send_suite(void)
 	tcase_add_test(tc_update, test_decrement_lifetime);
 
 	TCase * tc_auto = tcase_create("auto");
+	tcase_add_unchecked_fixture(tc_auto, auto_setup, auto_teardown);
 	tcase_add_test(tc_auto, test_add_prefix_auto_zero);
 	tcase_add_test(tc_auto, test_add_prefix_auto_base6);
 	tcase_add_test(tc_auto, test_add_prefix_auto_base6to4);

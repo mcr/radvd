@@ -254,6 +254,8 @@ EXTRA_check_all_SOURCES = \
 	privsep-linux.c
 
 check_all_SOURCES = \
+	test/getaddrs.c \
+	test/getaddrs.h \
 	test/print_safe_buffer.h \
 	test/print_safe_buffer.c \
 	test/check.c \
