@@ -22,6 +22,10 @@
 #define IPV6_ADDR_LINKLOCAL   0x0020U
 #endif
 
+#ifndef ARPHRD_6LOWPAN
+#define ARPHRD_6LOWPAN	825	/* IPv6 over LoWPAN */
+#endif
+
 static char const *hwstr(unsigned short sa_family);
 
 /*
@@ -80,11 +84,18 @@ int update_device_info(int sock, struct Interface *iface)
 		break;
 #endif				/* ARPHDR_ARCNET */
 #ifdef ARPHRD_IEEE802154
+        /* possible to have IEEE 802.15.4 interfaces that do not run 6LOWPAN */
 	case ARPHRD_IEEE802154:
 		iface->sllao.if_hwaddr_len = 64;
 		iface->sllao.if_prefix_len = 64;
 		break;
 #endif
+
+	case ARPHRD_6LOWPAN:
+		iface->sllao.if_hwaddr_len = 64;
+		iface->sllao.if_prefix_len = 64;
+		break;
+
 	default:
 		iface->sllao.if_hwaddr_len = -1;
 		iface->sllao.if_prefix_len = -1;
@@ -382,6 +393,9 @@ static char const *hwstr(unsigned short sa_family)
 		rc = "ARPHRD_IEEE802154_PHY";
 		break;
 #endif
+	case ARPHRD_6LOWPAN:
+		rc = "ARPHRD_6LOWPAN";
+		break;
 	case ARPHRD_VOID:
 		rc = "ARPHRD_VOID";
 		break;
