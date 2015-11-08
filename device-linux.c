@@ -22,6 +22,12 @@
 #define IPV6_ADDR_LINKLOCAL   0x0020U
 #endif
 
+#ifndef ARPHRD_6LOWPAN
+#define ARPHRD_6LOWPAN	825	/* IPv6 over LoWPAN */
+#endif
+
+static char const *hwstr(unsigned short sa_family);
+
 /*
  * this function gets the hardware type and address of an interface,
  * determines the link layer token length and checks it against
@@ -69,11 +75,20 @@ int update_device_info(struct Interface *iface)
 		dlog(LOG_DEBUG, 3, "hardware type for %s is ARPHRD_ARCNET", iface->Name);
 		break;
 #endif				/* ARPHDR_ARCNET */
+
+        /* possible to have IEEE 802.15.4 interfaces that do not run 6LOWPAN */
 	case ARPHRD_IEEE802154:
 		iface->if_hwaddr_len = 64;
 		iface->if_prefix_len = 64;
 		dlog(LOG_DEBUG, 3, "hardware type for %s is ARPHRD_IEEE802154", iface->Name);
+                break;
+
+	case ARPHRD_6LOWPAN:
+		iface->if_hwaddr_len = 64;
+		iface->if_prefix_len = 64;
+		dlog(LOG_DEBUG, 3, "hardware type for %s is ARPHRD_6LOWPAN", iface->Name);
 		break;
+
 	default:
 		iface->if_hwaddr_len = -1;
 		iface->if_prefix_len = -1;
